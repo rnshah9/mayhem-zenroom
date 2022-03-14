@@ -23,7 +23,11 @@
 
 #include <zen_big_factory.h>
 
+#define BIG_NEGATIVE 0
+#define BIG_POSITIVE 1
+
 typedef struct {
+        char zencode_positive;
 	char name[16];
 	int  len; // modbytes
 	int  chunksize;

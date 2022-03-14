@@ -127,6 +127,7 @@ big* big_new(lua_State *L) {
 	c->doublesize = 0;
 	c->val = NULL;
 	c->dval = NULL;
+        c->zencode_positive = BIG_POSITIVE;
 	return(c);
 }
 
@@ -366,6 +367,12 @@ static int big_from_decimal_string(lua_State *L) {
 	big_init(num);
 	BIG_zero(num->val);
 	int i = 0;
+        if(s[i] == '-') {
+                num->zencode_positive = BIG_NEGATIVE;
+                i++;
+        } else {
+                num->zencode_positive = BIG_POSITIVE;
+        }
 	while(s[i] != '\0') {
 	        BIG res;
 		BIG_copy(res, num->val);
@@ -436,9 +443,12 @@ static int big_to_fixed_octet(lua_State *L) {
   @param num number to be converted (zenroom.big)
   @return string which represent a decimal number (only digits 0-9)
 */
+// TODO: always show negative sign or put a flag?
 static int big_to_decimal_string(lua_State *L) {
        	big *num = big_arg(L,1); SAFE(num);
 	BIG_norm(num->val);
+
+        // I can modify safenum without loosing num
 	BIG safenum;
 	BIG_copy(safenum, num->val);
 	BIG ten_power;
@@ -459,7 +469,7 @@ static int big_to_decimal_string(lua_State *L) {
         	i++;
 		BIG_norm(ten_power);
 	}
-	char *s = zen_memory_alloc(i+3);
+	char *s = zen_memory_alloc(i+4);
 	if (i == 0) {
 		s[0] = '0';
 		i++;
@@ -480,6 +490,11 @@ static int big_to_decimal_string(lua_State *L) {
 			BIG_ddiv(safenum, dividend, ten);
 			i++;
 		}
+                // In the end I will reverse and the last minus
+                // will be at the beginning
+                if(!num->zencode_positive) {
+                        s[i] = '-'; i++;
+                }
 	}
 	s[i]='\0';
 
@@ -926,6 +941,46 @@ static int big_modinv(lua_State *L) {
 	return 1;
 }
 
+// algebraic sum (add and sub) taking under account zencode sign
+static void algebraic_sum(lua_State *L, big *c, big *a, big *b) {
+        if (a->zencode_positive == b->zencode_positive) {
+	        BIG_add(c->val, a->val, b->val);
+                c->zencode_positive = a->zencode_positive;
+        } else {
+                int res = _compare_bigs(L,a,b);
+                // a and b have opposite sign, so I do the bigger minus the
+                // smaller and take the sign of the bigger
+                if(res > 0) {
+	                BIG_sub(c->val, a->val, b->val);
+                        c->zencode_positive = a->zencode_positive;
+                } else {
+	                BIG_sub(c->val, b->val, a->val);
+                        c->zencode_positive = b->zencode_positive;
+                }
+        }
+
+}
+
+static int big_zenadd(lua_State *L) {
+	big *a = big_arg(L, 1); SAFE(a);
+	big *b = big_arg(L, 2); SAFE(b);
+	big *c = big_new(L); SAFE(c);
+        big_init(c);
+        algebraic_sum(L, c, a, b);
+	return 1;
+}
+
+static int big_zensub(lua_State *L) {
+	big *a = big_arg(L, 1); SAFE(a);
+	big *b = big_arg(L, 2); SAFE(b);
+	big *c = big_new(L); SAFE(c);
+        big_init(c);
+        b->zencode_positive = -b->zencode_positive;
+        algebraic_sum(L, c, a, b);
+        b->zencode_positive = -b->zencode_positive;
+	return 1;
+}
+
 static int big_parity(lua_State *L) {
 	big *c = big_arg(L, 1); SAFE(c);
 	lua_pushboolean(L, BIG_parity(c->val)==1); // big % 2
@@ -969,6 +1024,8 @@ int luaopen_big(lua_State *L) {
 		{"sqr",big_sqr},
 		{"bits",big_bits},
 		{"bytes",big_bytes},
+		{"zenadd",big_zenadd},
+		{"zensub",big_zensub},
 		{"modmul",big_modmul},
 		{"moddiv",big_moddiv},
 		{"modsqr",big_modsqr},

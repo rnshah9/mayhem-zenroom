@@ -264,7 +264,7 @@ local function _numinput(num)
 	elseif t == 'zenroom.big' then
 		return num, true
 	else
-		return BIG.new(num:octet()), true -- may give internal errors
+		return BIG.from_decimal(num:octet():string()), true -- may give internal errors
 	end
 	error("Invalid number", 2)
 	return nil, false
@@ -277,7 +277,10 @@ local function _mul(l,r) return(l * r) end
 local function _div(l,r) return(l / r) end
 local function _mod(l,r) return(l % r) end
 
-local function _math_op(op, l, r)
+local function _bigadd(l,r) return(BIG.zenadd(l, r)) end
+local function _bigsub(l,r) return(BIG.zensub(l, r)) end
+
+local function _math_op(op, l, r, bigop)
 	local left, lz  = _numinput(l)
 	local right, rz = _numinput(r)
 	if lz ~= rz then error("Incompatible numeric arguments", 2) end
@@ -294,6 +297,9 @@ local function _math_op(op, l, r)
 				   luatype = 'number',
 				   zentype = 'element' })
 	end
+        if bigop and type(lz) then
+          op = bigop
+        end
 	return op(left, right), codec
 end
 
@@ -307,7 +313,7 @@ When("create the result of '' + ''", function(left,right)
 	local l = have(left)
 	local r = have(right)
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_add, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_add, l, r, _bigadd)
 end)
 
 When("create the result of '' in '' + ''", function(left, dict, right)
