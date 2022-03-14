@@ -172,13 +172,6 @@ Then print the 'array' as 'number'
 and print the 'aggregation' as 'number'
 EOF
 
-cat <<EOF | zexe cbor.zen -a array_random_nums.json
-Given I have an 'number array' named 'array'
-When I create the cbor of 'array'
-Then print the 'cbor' as 'hex'
-and print the 'array'
-EOF
-
 # cat << EOF > array_public_bls.json
 # { "public_keys": {
 #  "Alice":{"reflow_public_key": "KrfEl2HFpml3di0N5vnrN+yrbSgiSClGBgz9zEmp2BihHOejIuOrTsOS573Fh6ciCxv6jI3syiF7mfGKUKXurUruj1kUtJfRpXHXa4d22LlioeB9uv+l14qhecrFojboOGrxZulFoDKVVWVCB0/bAD6HquSmvX4+jyPl/BLt6TUnNDLeWK8vm6zu9sR8/XFtKqEfCgQB4u0vbDhqOKhRNut8MjLtMcxYgWZTunmszNAZdAGMcYSod/0p1AzOnAUi"},
