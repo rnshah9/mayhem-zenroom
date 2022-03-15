@@ -399,7 +399,8 @@ When("create the result of '' / ''", function(left,right)
 	local l = have(left)
 	local r = have(right)
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_div, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_div, l, r, BIG.zendiv)
+        print(ACK.result:decimal())
 end)
 
 When("create the result of '' in '' / ''", function(left, dict, right)
@@ -407,7 +408,7 @@ When("create the result of '' in '' / ''", function(left, dict, right)
 	local l = d[left]
 	local r = have(right)
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_div, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_div, l, r, BIG.zendiv)
 end)
 
 When("create the result of '' / '' in ''", function(left, right, dict)
@@ -415,7 +416,7 @@ When("create the result of '' / '' in ''", function(left, right, dict)
 	local d = have(dict)
 	local r = d[right]
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_div, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_div, l, r, BIG.zendiv)
 end)
 
 When("create the result of '' in '' / '' in ''", function(left, ldict, right, rdict)
@@ -424,14 +425,15 @@ When("create the result of '' in '' / '' in ''", function(left, ldict, right, rd
 	local rd = have(rdict)
 	local r = rd[right]
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_div, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_div, l, r, BIG.zendiv)
 end)
 
 When("create the result of '' % ''", function(left,right)
 	local l = have(left)
 	local r = have(right)
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_mod, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_mod, l, r, BIG.zenmod)
+        print(ACK.result:decimal())
 end)
 
 When("create the result of '' in '' % ''", function(left, dict, right)
@@ -439,7 +441,7 @@ When("create the result of '' in '' % ''", function(left, dict, right)
 	local l = d[left]
 	local r = have(right)
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_mod, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_mod, l, r, BIG.zendiv)
 end)
 
 When("create the result of '' in '' % '' in ''", function(left, ldict, right, rdict)
@@ -448,7 +450,7 @@ When("create the result of '' in '' % '' in ''", function(left, ldict, right, rd
 	local rd = have(rdict)
 	local r = rd[right]
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_mod, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_mod, l, r, BIG.zendiv)
 end)
 
 -- TODO:
