@@ -120,9 +120,8 @@ cat <<EOF | save numbers boolean.json
      "age": 6 }
 }
 EOF
-cat <<EOF | debug booleans.zen -a boolean.json
+cat <<EOF | zexe booleans.zen -a boolean.json
 Given I have a 'string dictionary' named 'mycat'
-When debug
 Then print all data
 EOF
 
@@ -278,6 +277,7 @@ cat <<EOF  >big_pos_and_neg.data
   "array": [ 5000, 5.6, "1.0", "1000000", "-300", "stringa" ]
 }
 EOF
+
 # | zexe big_pos_and_neg.zen -a big_pos_and_neg.data
 cat <<EOF | debug big_pos_and_neg.zen -a big_pos_and_neg.data
 Given I have a 'number' named 'a'
@@ -286,7 +286,6 @@ Given I have a 'float' named 'fp1'
 Given I have a 'number' named 'fp2'
 Given I have a 'number' named 'c'
 Given I have a 'number' named 'd'
-and debug
 Given I have a 'string array' named 'array'
 When I create the result of 'a' + 'b'
 and I rename the 'result' to 'a+b'
@@ -300,7 +299,8 @@ When I create the result of 'b' * 'a'
 and I rename the 'result' to 'b*a'
 When I create the result of 'b' / 'a'
 and I rename the 'result' to 'b/a'
-Then print data
+# When I delete the 'array'
+Then print all data
 EOF
 
 success

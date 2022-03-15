@@ -188,7 +188,6 @@ end
     end
 
     if objtype == 'number' or tonumber(obj) then
-       I.warn({number_detected = obj})
        if expect_table(definition) then
 	  error("Cannot take object: expected '"..definition.."' but found '"..objtype.."' (not a table)",3)
        -- elseif definition ~= 'number' then
@@ -261,8 +260,8 @@ end
        luatype = guessed.luatype,
        root = guessed.root
     }
-    I.warn({ codec = ZEN.CODEC[guessed.name],
-	     guessed = guessed })
+    -- I.warn({ codec = ZEN.CODEC[guessed.name],
+    -- 	     guessed = guessed })
     -- TODO: make xxx print to stderr!
     -- xxx('Operating conversion on: '..guessed.name)
     if guessed.zentype == 'schema' then
@@ -384,7 +383,10 @@ local function f_factory_outcast(fun)
       -- passthrough native number data
       if dt == 'number' or dt == 'boolean' then
 	 return data
-      elseif iszen(dt) and dt ~= 'zenroom.octet' then
+      elseif dt == 'zenroom.big' then
+	 -- always export BIG INT as decimal
+	 return BIG.to_decimal(data)
+      elseif iszen(dt) then
 	 -- leverage first class citizen method on zenroom data
 	 return fun(data:octet())
       end
@@ -413,6 +415,10 @@ end
        return f_factory_outcast(O.to_bin)
     elseif cast == 'mnemonic' then
        return f_factory_outcast(O.to_mnemonic)
+    elseif cast == 'float' then
+       return f_factory_outcast(tonumber)
+    elseif cast == 'integer' then
+       return f_factory_outcast(BIG.to_decimal)
     elseif cast == 'number' then
        return f_factory_outcast(tonumber)
     elseif cast == 'boolean' then
