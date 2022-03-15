@@ -26,6 +26,7 @@
 #define BIG_NEGATIVE -1
 #define BIG_POSITIVE 1
 #define BIG_OPPOSITE(SIGN) (-(SIGN))
+#define BIG_MULSIGN(A, B) ((A) * (B))
 
 typedef struct {
         char zencode_positive;

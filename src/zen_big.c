@@ -492,7 +492,7 @@ static int big_to_decimal_string(lua_State *L) {
 		}
                 // In the end I will reverse and the last minus
                 // will be at the beginning
-                if(!num->zencode_positive) {
+                if(num->zencode_positive == BIG_NEGATIVE) {
                         s[i] = '-'; i++;
                 }
 	}
@@ -981,6 +981,35 @@ static int big_zensub(lua_State *L) {
 	return 1;
 }
 
+// the result is expected to be inside a BIG
+static int big_zenmul(lua_State *L) {
+	big *a = big_arg(L, 1); SAFE(a);
+	big *b = big_arg(L, 2); SAFE(b);
+	if(a->doublesize || b->doublesize) {
+		lerror(L,"cannot multiply double BIG numbers");
+		return 0;
+        }
+	//BIG_norm(a->val); BIG_norm(b->val);
+        DBIG result;
+        BIG top;
+	big *bottom = big_new(L); SAFE(bottom);
+        big_init(bottom);
+
+        BIG_mul(result, a->val, b->val);
+        BIG_sdcopy(bottom->val, result);
+        BIG_sducopy(top, result);
+
+        // check that the result is a big (not a dbig)
+        if(!iszero(top)) {
+		lerror(L,"the result is too big");
+		return 0;
+        }
+
+        bottom->zencode_positive = BIG_MULSIGN(a->zencode_positive, b->zencode_positive);
+
+	return 1;
+}
+
 static int big_parity(lua_State *L) {
 	big *c = big_arg(L, 1); SAFE(c);
 	lua_pushboolean(L, BIG_parity(c->val)==1); // big % 2
@@ -1026,6 +1055,7 @@ int luaopen_big(lua_State *L) {
 		{"bytes",big_bytes},
 		{"zenadd",big_zenadd},
 		{"zensub",big_zensub},
+		{"zenmul",big_zenmul},
 		{"modmul",big_modmul},
 		{"moddiv",big_moddiv},
 		{"modsqr",big_modsqr},

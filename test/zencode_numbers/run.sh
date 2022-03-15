@@ -289,6 +289,8 @@ When I create the result of 'b' - 'a'
 and I rename the 'result' to 'b-a'
 When I create the result of 'b' + 'a'
 and I rename the 'result' to 'b+a'
+When I create the result of 'b' * 'a'
+and I rename the 'result' to 'b*a'
 Then print data
 EOF
 $Z -z big_pos_and_neg.zen -a big_pos_and_neg.data
