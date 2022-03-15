@@ -942,7 +942,7 @@ static int big_modinv(lua_State *L) {
 }
 
 // algebraic sum (add and sub) taking under account zencode sign
-static void algebraic_sum(lua_State *L, big *c, big *a, big *b) {
+static void _algebraic_sum(lua_State *L, big *c, big *a, big *b) {
         if (a->zencode_positive == b->zencode_positive) {
 	        BIG_add(c->val, a->val, b->val);
                 c->zencode_positive = a->zencode_positive;
@@ -966,7 +966,7 @@ static int big_zenadd(lua_State *L) {
 	big *b = big_arg(L, 2); SAFE(b);
 	big *c = big_new(L); SAFE(c);
         big_init(c);
-        algebraic_sum(L, c, a, b);
+        _algebraic_sum(L, c, a, b);
 	return 1;
 }
 
@@ -976,7 +976,7 @@ static int big_zensub(lua_State *L) {
 	big *c = big_new(L); SAFE(c);
         big_init(c);
         b->zencode_positive = BIG_OPPOSITE(b->zencode_positive);
-        algebraic_sum(L, c, a, b);
+        _algebraic_sum(L, c, a, b);
         b->zencode_positive = BIG_OPPOSITE(b->zencode_positive);
 	return 1;
 }
@@ -1006,6 +1006,48 @@ static int big_zenmul(lua_State *L) {
         }
 
         bottom->zencode_positive = BIG_MULSIGN(a->zencode_positive, b->zencode_positive);
+
+	return 1;
+}
+
+static int big_zendiv(lua_State *L) {
+	big *a = big_arg(L, 1); SAFE(a);
+	big *b = big_arg(L, 2); SAFE(b);
+	if(a->doublesize || b->doublesize) {
+		lerror(L,"cannot multiply double BIG numbers");
+		return 0;
+        }
+        DBIG dividend;
+        BIG_dzero(dividend);
+        dcopy(dividend, a->val);
+	big *result = big_new(L); SAFE(result);
+        big_init(result);
+
+        BIG_ddiv(result->val, dividend, b->val);
+
+        result->zencode_positive = BIG_MULSIGN(a->zencode_positive, b->zencode_positive);
+
+	return 1;
+}
+
+static int big_zenmod(lua_State *L) {
+	big *a = big_arg(L, 1); SAFE(a);
+	big *b = big_arg(L, 2); SAFE(b);
+	if(a->doublesize || b->doublesize) {
+		lerror(L,"cannot multiply double BIG numbers");
+		return 0;
+        }
+	if(a->zencode_positive == BIG_NEGATIVE || b->zencode_positive == BIG_NEGATIVE) {
+		lerror(L,"modulo operation only available with positive numbers");
+		return 0;
+        }
+	big *result = big_new(L); SAFE(result);
+        big_init(result);
+        BIG_copy(result->val, a->val);
+
+        BIG_mod(result->val, b->val);
+
+        result->zencode_positive = BIG_POSITIVE;
 
 	return 1;
 }
@@ -1056,6 +1098,8 @@ int luaopen_big(lua_State *L) {
 		{"zenadd",big_zenadd},
 		{"zensub",big_zensub},
 		{"zenmul",big_zenmul},
+		{"zendiv",big_zendiv},
+		{"zenmod",big_zenmod},
 		{"modmul",big_modmul},
 		{"moddiv",big_moddiv},
 		{"modsqr",big_modsqr},
