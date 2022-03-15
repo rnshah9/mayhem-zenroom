@@ -132,7 +132,8 @@ local function _delete_f(name)
 end
 When("delete ''", _delete_f)
 When("remove ''", _delete_f)
-
+When("delete the ''", _delete_f)
+When("remove the ''", _delete_f)
 
 When("rename the '' to ''", function(old,new)
 	have(old)
@@ -317,7 +318,6 @@ When("create the result of '' + ''", function(left,right)
 	local r = have(right)
 	empty 'result'
 	ACK.result, ZEN.CODEC.result = _math_op(_add, l, r, BIG.zenadd)
-        print(ACK.result:decimal())
 end)
 
 When("create the result of '' in '' + ''", function(left, dict, right)
@@ -342,7 +342,6 @@ When("create the result of '' - ''", function(left,right)
 	local r = have(right)
 	empty 'result'
 	ACK.result, ZEN.CODEC.result = _math_op(_sub, l, r, BIG.zensub)
-        print(ACK.result:decimal())
 end)
 
 When("create the result of '' in '' - ''", function(left, dict, right)
@@ -367,7 +366,6 @@ When("create the result of '' * ''", function(left,right)
 	local r = have(right)
 	empty 'result'
 	ACK.result, ZEN.CODEC.result = _math_op(_mul, l, r, BIG.zenmul)
-        print(ACK.result:decimal())
 end)
 
 When("create the result of '' in '' * ''", function(left, dict, right)
@@ -400,7 +398,6 @@ When("create the result of '' / ''", function(left,right)
 	local r = have(right)
 	empty 'result'
 	ACK.result, ZEN.CODEC.result = _math_op(_div, l, r, BIG.zendiv)
-        print(ACK.result:decimal())
 end)
 
 When("create the result of '' in '' / ''", function(left, dict, right)
@@ -433,7 +430,6 @@ When("create the result of '' % ''", function(left,right)
 	local r = have(right)
 	empty 'result'
 	ACK.result, ZEN.CODEC.result = _math_op(_mod, l, r, BIG.zenmod)
-        print(ACK.result:decimal())
 end)
 
 When("create the result of '' in '' % ''", function(left, dict, right)
