@@ -23,8 +23,9 @@
 
 #include <zen_big_factory.h>
 
-#define BIG_NEGATIVE 0
+#define BIG_NEGATIVE -1
 #define BIG_POSITIVE 1
+#define BIG_OPPOSITE(SIGN) (-(SIGN))
 
 typedef struct {
         char zencode_positive;

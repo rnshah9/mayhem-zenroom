@@ -277,9 +277,6 @@ local function _mul(l,r) return(l * r) end
 local function _div(l,r) return(l / r) end
 local function _mod(l,r) return(l % r) end
 
-local function _bigadd(l,r) return(BIG.zenadd(l, r)) end
-local function _bigsub(l,r) return(BIG.zensub(l, r)) end
-
 local function _math_op(op, l, r, bigop)
 	local left, lz  = _numinput(l)
 	local right, rz = _numinput(r)
@@ -297,8 +294,14 @@ local function _math_op(op, l, r, bigop)
 				   luatype = 'number',
 				   zentype = 'element' })
 	end
-        if bigop and type(lz) then
-          op = bigop
+        if type(left) == 'zenroom.big'
+          and type(right) == 'zenroom.big' then
+          if bigop then
+            op = bigop
+          -- -- We should check if the operatoin is supported
+          --else
+          --  error("Operation not supported on big integers")
+          end
         end
 	return op(left, right), codec
 end
@@ -313,7 +316,8 @@ When("create the result of '' + ''", function(left,right)
 	local l = have(left)
 	local r = have(right)
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_add, l, r, _bigadd)
+	ACK.result, ZEN.CODEC.result = _math_op(_add, l, r, BIG.zenadd)
+        I.warn(ACK.result)
 end)
 
 When("create the result of '' in '' + ''", function(left, dict, right)
@@ -321,7 +325,7 @@ When("create the result of '' in '' + ''", function(left, dict, right)
 	local l = d[left]
 	local r = have(right)
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_add, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_add, l, r, BIG.zenadd)
 end)
 
 When("create the result of '' in '' + '' in ''", function(left, ldict, right, rdict)
@@ -330,14 +334,15 @@ When("create the result of '' in '' + '' in ''", function(left, ldict, right, rd
 	local rd = have(rdict)
 	local r = rd[right]
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_add, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_add, l, r, BIG.zenadd)
 end)
 
 When("create the result of '' - ''", function(left,right)
 	local l = have(left)
 	local r = have(right)
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_sub, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_sub, l, r, BIG.zensub)
+        I.warn(ACK.result)
 end)
 
 When("create the result of '' in '' - ''", function(left, dict, right)
@@ -345,7 +350,7 @@ When("create the result of '' in '' - ''", function(left, dict, right)
 	local l = d[left]
 	local r = have(right)
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_sub, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_sub, l, r, BIG.zensub)
 end)
 
 When("create the result of '' in '' - '' in ''", function(left, ldict, right, rdict)
@@ -354,7 +359,7 @@ When("create the result of '' in '' - '' in ''", function(left, ldict, right, rd
 	local rd = have(rdict)
 	local r = rd[right]
 	empty 'result'
-	ACK.result, ZEN.CODEC.result = _math_op(_sub, l, r)
+	ACK.result, ZEN.CODEC.result = _math_op(_sub, l, r, BIG.zensub)
 end)
 
 When("create the result of '' * ''", function(left,right)

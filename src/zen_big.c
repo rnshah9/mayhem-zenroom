@@ -975,9 +975,9 @@ static int big_zensub(lua_State *L) {
 	big *b = big_arg(L, 2); SAFE(b);
 	big *c = big_new(L); SAFE(c);
         big_init(c);
-        b->zencode_positive = -b->zencode_positive;
+        b->zencode_positive = BIG_OPPOSITE(b->zencode_positive);
         algebraic_sum(L, c, a, b);
-        b->zencode_positive = -b->zencode_positive;
+        b->zencode_positive = BIG_OPPOSITE(b->zencode_positive);
 	return 1;
 }
 
