@@ -126,18 +126,50 @@ static int float_to_octet(lua_State *L) {
 static int float_eq(lua_State *L) {
 	float *a = float_arg(L,1); SAFE(a);
 	float *b = float_arg(L,2); SAFE(b);
-        if (!a || !b) {
-                // They could be both NULL
-                lua_pushboolean(L, a == b);
-        }
         lua_pushboolean(L, *a == *b);
+	return 1;
+}
+
+static int float_add(lua_State *L) {
+	float *a = float_arg(L,1); SAFE(a);
+	float *b = float_arg(L,2); SAFE(b);
+        float *c = float_new(L); SAFE(c);
+        *c = *a + *b;
+	return 1;
+}
+
+static int float_sub(lua_State *L) {
+	float *a = float_arg(L,1); SAFE(a);
+	float *b = float_arg(L,2); SAFE(b);
+        float *c = float_new(L); SAFE(c);
+        *c = *a - *b;
+	return 1;
+}
+
+static int float_mul(lua_State *L) {
+	float *a = float_arg(L,1); SAFE(a);
+	float *b = float_arg(L,2); SAFE(b);
+        float *c = float_new(L); SAFE(c);
+        *c = *a * *b;
+	return 1;
+}
+
+static int float_div(lua_State *L) {
+	float *a = float_arg(L,1); SAFE(a);
+	float *b = float_arg(L,2); SAFE(b);
+        float *c = float_new(L); SAFE(c);
+        *c = *a / *b;
 	return 1;
 }
 
 static int string_from_float(lua_State *L) {
 	float *c = float_arg(L,1); SAFE(c);
-        char dest[10];
-        sprintf(dest, "%8f", *c);
+        char dest[1024];
+        size_t bufsz = snprintf(dest, 1024, "%.6f", *c);
+        if(bufsz >= 1024) {
+	        lerror(L, "Output size too big");
+                return 0;
+        }
         lua_pushstring(L, dest);
 	return 1;
 }
@@ -154,6 +186,10 @@ int luaopen_float(lua_State *L) {
 		{"octet",float_to_octet},
 		{"__tostring",string_from_float},
 		{"__eq",float_eq},
+		{"__add",float_add},
+		{"__sub",float_sub},
+		{"__mul",float_mul},
+		{"__div",float_div},
 		{NULL,NULL}
 	};
 	zen_add_class("float", float_class, float_methods);
