@@ -35,8 +35,6 @@
 #include <zen_octet.h>
 #include <zen_memory.h>
 
-extern zenroom_t *Z;
-
 octet *new_octet_from_float(lua_State *L, float *f) {
         octet *o;
         char *byts = (char*)f;
@@ -89,8 +87,18 @@ static int newfloat(lua_State *L) {
         if(lua_isnumber(L, 1)) {
                 lua_Number number = lua_tonumber(L, 1);
                 float *flt = float_new(L);
-                // TODO: check that they are the same type
                 *flt = (float)number;
+                return 1;
+        }
+        if(lua_isstring(L, 1)) {
+                const char* arg = lua_tostring(L, 1);
+                float *flt = float_new(L);
+                char *pEnd;
+                *flt = strtof(arg, &pEnd);
+                if(*pEnd) {
+                        lerror(L, "Could not parse float number %s", arg);
+                        return 0;
+                }
                 return 1;
         }
 	// octet argument, import
@@ -108,10 +116,7 @@ float* float_arg(lua_State *L,int n) {
 
 	octet *o = o_arg(L,n);
 	if(o) {
-		float *b  = float_new(L); SAFE(b);
-
-		lua_pop(L,1);
-		return(b);
+		return new_float_from_octet(L, o);
 	}
 	lerror(L, "invalib float number in argument");
 	return NULL;
@@ -165,7 +170,7 @@ static int float_div(lua_State *L) {
 static int string_from_float(lua_State *L) {
 	float *c = float_arg(L,1); SAFE(c);
         char dest[1024];
-        size_t bufsz = snprintf(dest, 1024, "%.6f", *c);
+        size_t bufsz = snprintf(dest, 1024, "%f", *c);
         if(bufsz >= 1024) {
 	        lerror(L, "Output size too big");
                 return 0;
