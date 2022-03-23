@@ -471,7 +471,106 @@ When("remove zero values in ''", function(target)
 	end, ACK[target])
 end)
 
+local function trim(s)
+  s = string.gsub(s, "^[%s_]+", "")
+  s = string.gsub(s, "[%s_]+$", "")
+  return s
+end
+
 -- When("remove all empty strings in ''", function(target)
 -- 	have(target)
 -- 	ACK[target] = deepmap(function(v) if trim(v) == '' then return nil end, ACK[target])
 -- end)
+local int_ops = {['+'] = BIG.zenadd, ['-'] = BIG.zensub, ['*'] = BIG.zenmul, ['/'] = BIG.zendiv}
+local float_ops = {['+'] = F.add, ['-'] = F.sub, ['*'] = F.mul, ['/'] = F.div}
+
+local function apply_op(op, a, b)
+  local fop = nil
+  if type(a) == 'zenroom.big' and type(b) == 'zenroom.big' then
+    fop = int_ops[op]
+  elseif type(a) == 'zenroom.float' and type(b) == 'zenroom.float' then
+    fop = float_ops[op]
+  end
+  ZEN.assert(fop, "Unknown types to do arithmetics on", 2)
+  return fop(a, b)
+end
+
+
+local priorities = {['+'] = 0, ['-'] = 0, ['*'] = 1, ['/'] = 1}
+When("create the result of ''", function(expr)
+  local specials = {'(', ')'}
+  local i, j
+  for k, v in pairs(priorities) do
+    table.insert(specials, k)
+  end
+  I.spy(expr)
+  -- tokenizations
+  local re = '[' .. table.concat(specials) .. ']'
+  local tokens = {}
+  i = 1
+  repeat
+    j = expr:find(re, i)
+    if j then
+      if i < j then
+        local val = trim(expr:sub(i, j-1))
+        if val ~= "" then table.insert(tokens, val) end
+      end
+      table.insert(tokens, expr:sub(j, j))
+      i = j+1
+    end
+  until not j
+  if i <= #expr then
+    local val = trim(expr:sub(i))
+    if val ~= "" then table.insert(tokens, val) end
+  end
+
+  -- infix to RPN
+  local rpn = {}
+  local operators = {}
+  for k, v in pairs(tokens) do
+    if priorities[v] then
+      if #operators > 0 and operators[#operators] ~= '('
+           and priorities[operators[#operators]]>priorities[v] then
+        table.insert(rpn, operators[#operators])
+        operators[#operators] = v
+      else
+        table.insert(operators, v)
+      end -- TODO ci sono altri casi?
+    elseif v == '(' then
+      table.insert(operators, v)
+    elseif v == ')' then
+      -- put every operator in rpn until I don't see the open parens
+      while #operators > 0 and operators[#operators] ~= '(' do
+        table.insert(rpn, operators[#operators])
+        operators[#operators] = nil
+      end
+      ZEN.assert(#operators > 0, "Parantesis not balanced", 2)
+      operators[#operators] = nil -- remove open parens
+    else
+      table.insert(rpn, v)
+    end
+  end
+
+  -- all remaining operators have to be applied
+  for i = #operators, 1, -1 do
+    table.insert(rpn, operators[i])
+  end
+
+  local values = {}
+  -- evaluate the expression
+  for k, v in pairs(rpn) do
+    if priorities[v] then
+      ZEN.assert(#values >= 2)
+      local op1 = values[#values]; values[#values] = nil
+      local op2 = values[#values]; values[#values] = nil
+      local res = apply_op(v, op1, op2)
+      table.insert(values, res)
+    else
+      local val = have(v)
+      table.insert(values, val)
+    end
+  end
+
+
+  I.spy(values)
+end)

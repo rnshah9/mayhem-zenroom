@@ -185,6 +185,10 @@ int luaopen_float(lua_State *L) {
 		{"new",newfloat},
 		{"to_octet",float_to_octet},
 		{"eq",float_eq},
+		{"add",float_add},
+		{"sub",float_sub},
+		{"mul",float_mul},
+		{"div",float_div},
 		{NULL,NULL}
 	};
 	const struct luaL_Reg float_methods[] = {

@@ -303,4 +303,26 @@ and I rename the 'result' to 'b/a'
 Then print all data
 EOF
 
+cat <<EOF >expressions.data
+{
+  "a": "1",
+  "b": "2",
+  "c": "-3",
+  "d": "4",
+  "the solution": "42",
+  "11": "22",
+}
+EOF
+
+cat <<EOF | debug expressions.zen -a expressions.data
+Given I have a 'integer' named 'a'
+Given I have a 'integer' named 'b'
+Given I have a 'integer' named 'c'
+Given I have a 'integer' named 'd'
+Given I have a 'integer' named 'the solution'
+When I create the result of 'a * b + c'
+When I create the result of 'a * (b + c)'
+When I create the result of '(the solution  + a) * (b + c)'
+When I create the result of '((the solution * d + b)  + a) * (b + (c + a * the solution))'
+EOF
 success
