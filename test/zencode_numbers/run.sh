@@ -324,5 +324,34 @@ When I create the result of 'a * b + c'
 When I create the result of 'a * (b + c)'
 When I create the result of '(the solution  + a) * (b + c)'
 When I create the result of '((the solution * d + b)  + a) * (b + (c + a * the solution))'
+When I create the result of '(a + b * (a + b * (a + b))) * c + a'
+When I create the result of 'b * b * b * b+a'
+When I create the result of '(a + b) * (a + b) * (a + b * (a + b * (a + b))) * c + a'
+When I create the result of 'the solution / (a + b + 1)'
 EOF
+
+cat <<EOF >expressions_float.data
+{
+  "a": "1.0",
+  "b": "2.0",
+  "c": "-3.0",
+  "d": "4.0",
+  "the solution": "42.0",
+}
+EOF
+
+cat <<EOF | debug expressions_float.zen -a expressions_float.data
+Given I have a 'float' named 'a'
+Given I have a 'float' named 'b'
+Given I have a 'float' named 'c'
+Given I have a 'float' named 'd'
+Given I have a 'float' named 'the solution'
+When I create the result of 'the solution / (a + b + 1.0)'
+When I create the result of '  (   (    a +   b  )   * ( b   +  c)) * (a / d)'
+When I create the result of 'a / b / c'
+When I create the result of 'a / b * c / d + a * b / c / d'
+When I create the result of '-a'
+EOF
+
+
 success

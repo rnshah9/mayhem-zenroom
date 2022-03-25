@@ -505,7 +505,7 @@ When("create the result of ''", function(expr)
   end
   I.spy(expr)
   -- tokenizations
-  local re = '[' .. table.concat(specials) .. ']'
+  local re = '[()*%-%/+]'
   local tokens = {}
   i = 1
   repeat
@@ -529,13 +529,12 @@ When("create the result of ''", function(expr)
   local operators = {}
   for k, v in pairs(tokens) do
     if priorities[v] then
-      if #operators > 0 and operators[#operators] ~= '('
-           and priorities[operators[#operators]]>priorities[v] then
+      while #operators > 0 and operators[#operators] ~= '('
+           and priorities[operators[#operators]]>=priorities[v] do
         table.insert(rpn, operators[#operators])
-        operators[#operators] = v
-      else
-        table.insert(operators, v)
-      end -- TODO ci sono altri casi?
+        operators[#operators] = nil
+      end
+      table.insert(operators, v)
     elseif v == '(' then
       table.insert(operators, v)
     elseif v == ')' then
@@ -544,7 +543,7 @@ When("create the result of ''", function(expr)
         table.insert(rpn, operators[#operators])
         operators[#operators] = nil
       end
-      ZEN.assert(#operators > 0, "Parantesis not balanced", 2)
+      ZEN.assert(#operators > 0, "Paranthesis not balanced", 2)
       operators[#operators] = nil -- remove open parens
     else
       table.insert(rpn, v)
@@ -553,8 +552,12 @@ When("create the result of ''", function(expr)
 
   -- all remaining operators have to be applied
   for i = #operators, 1, -1 do
+    if operators[i] == '(' then
+      ZEN.assert(false, "Paranthesis not balanced", 2)
+    end
     table.insert(rpn, operators[i])
   end
+  I.warn(rpn)
 
   local values = {}
   -- evaluate the expression
@@ -563,14 +566,22 @@ When("create the result of ''", function(expr)
       ZEN.assert(#values >= 2)
       local op1 = values[#values]; values[#values] = nil
       local op2 = values[#values]; values[#values] = nil
-      local res = apply_op(v, op1, op2)
+      local res = apply_op(v, op2, op1)
       table.insert(values, res)
     else
-      local val = have(v)
+      local val
+      -- is the current number a integer?
+      if BIG.is_integer(v) then
+        val = BIG.from_decimal(v)
+      elseif F.is_float(v) then
+        val = F.new(v)
+      else
+        val = have(v)
+      end
       table.insert(values, val)
     end
   end
 
-
+  ZEN.assert(#values == 1, "Invalid arithmetical expression", 2)
   I.spy(values)
 end)
