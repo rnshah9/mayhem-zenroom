@@ -328,6 +328,7 @@ When I create the result of '(a + b * (a + b * (a + b))) * c + a'
 When I create the result of 'b * b * b * b+a'
 When I create the result of '(a + b) * (a + b) * (a + b * (a + b * (a + b))) * c + a'
 When I create the result of 'the solution / (a + b + 1)'
+When I create the result of '-a * (-b -c - (-c+d))'
 EOF
 
 cat <<EOF >expressions_float.data
@@ -350,7 +351,7 @@ When I create the result of 'the solution / (a + b + 1.0)'
 When I create the result of '  (   (    a +   b  )   * ( b   +  c)) * (a / d)'
 When I create the result of 'a / b / c'
 When I create the result of 'a / b * c / d + a * b / c / d'
-When I create the result of '-a'
+When I create the result of '-a * (-b -c - (-c+d))'
 EOF
 
 

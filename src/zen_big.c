@@ -164,6 +164,7 @@ big *big_dup(lua_State *L, big *s) {
 		big_init(n);
 		BIG_rcopy(n->val,s->val);
 	}
+        n->zencode_positive = s->zencode_positive;
 	return(n);
 }
 
@@ -1052,6 +1053,15 @@ static int big_zenmod(lua_State *L) {
 	return 1;
 }
 
+static int big_zenopposite(lua_State *L) {
+	big *a = big_arg(L, 1); SAFE(a);
+	big *result = big_dup(L, a); SAFE(result);
+
+        result->zencode_positive = BIG_OPPOSITE(result->zencode_positive);
+
+	return 1;
+}
+
 static int is_integer(lua_State *L) {
         int result = 0;
         if(lua_isinteger(L, 1)) {
@@ -1123,6 +1133,7 @@ int luaopen_big(lua_State *L) {
 		{"zenmul",big_zenmul},
 		{"zendiv",big_zendiv},
 		{"zenmod",big_zenmod},
+		{"zenopposite",big_zenopposite},
 		{"modmul",big_modmul},
 		{"moddiv",big_moddiv},
 		{"modsqr",big_modsqr},

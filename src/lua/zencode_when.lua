@@ -481,22 +481,37 @@ end
 -- 	have(target)
 -- 	ACK[target] = deepmap(function(v) if trim(v) == '' then return nil end, ACK[target])
 -- end)
-local int_ops = {['+'] = BIG.zenadd, ['-'] = BIG.zensub, ['*'] = BIG.zenmul, ['/'] = BIG.zendiv}
-local float_ops = {['+'] = F.add, ['-'] = F.sub, ['*'] = F.mul, ['/'] = F.div}
+local int_ops2 = {['+'] = BIG.zenadd, ['-'] = BIG.zensub, ['*'] = BIG.zenmul, ['/'] = BIG.zendiv}
+local float_ops2 = {['+'] = F.add, ['-'] = F.sub, ['*'] = F.mul, ['/'] = F.div}
 
-local function apply_op(op, a, b)
+local function apply_op2(op, a, b)
   local fop = nil
   if type(a) == 'zenroom.big' and type(b) == 'zenroom.big' then
-    fop = int_ops[op]
+    fop = int_ops2[op]
   elseif type(a) == 'zenroom.float' and type(b) == 'zenroom.float' then
-    fop = float_ops[op]
+    fop = float_ops2[op]
   end
   ZEN.assert(fop, "Unknown types to do arithmetics on", 2)
   return fop(a, b)
 end
 
+local int_ops1 = {['~'] = BIG.zenopposite}
+local float_ops1 = {['~'] = F.opposite}
 
-local priorities = {['+'] = 0, ['-'] = 0, ['*'] = 1, ['/'] = 1}
+local function apply_op1(op, a)
+  local fop = nil
+  if type(a) == 'zenroom.big' then
+    fop = int_ops1[op]
+  elseif type(a) == 'zenroom.float' then
+    fop = float_ops1[op]
+  end
+  ZEN.assert(fop, "Unknown type to do arithmetics on", 2)
+  return fop(a)
+end
+
+
+-- ~ is unary minus
+local priorities = {['+'] = 0, ['-'] = 0, ['*'] = 1, ['/'] = 1, ['~'] = 2}
 When("create the result of ''", function(expr)
   local specials = {'(', ')'}
   local i, j
@@ -528,7 +543,9 @@ When("create the result of ''", function(expr)
   local rpn = {}
   local operators = {}
   for k, v in pairs(tokens) do
-    if priorities[v] then
+    if v == '-' and (#operators == 0 or operators[#operators] == '(') then
+        table.insert(operators, '~') -- unary minus (change sign)
+    elseif priorities[v] then
       while #operators > 0 and operators[#operators] ~= '('
            and priorities[operators[#operators]]>=priorities[v] do
         table.insert(rpn, operators[#operators])
@@ -557,16 +574,18 @@ When("create the result of ''", function(expr)
     end
     table.insert(rpn, operators[i])
   end
-  I.warn(rpn)
 
   local values = {}
   -- evaluate the expression
   for k, v in pairs(rpn) do
-    if priorities[v] then
+    if v == '~' then
+      local op = values[#values]; values[#values] = nil
+      table.insert(values, apply_op1(v, op))
+    elseif priorities[v] then
       ZEN.assert(#values >= 2)
       local op1 = values[#values]; values[#values] = nil
       local op2 = values[#values]; values[#values] = nil
-      local res = apply_op(v, op2, op1)
+      local res = apply_op2(v, op2, op1)
       table.insert(values, res)
     else
       local val

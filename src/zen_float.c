@@ -157,6 +157,13 @@ static int float_add(lua_State *L) {
 	return 1;
 }
 
+static int float_opposite(lua_State *L) {
+	float *a = float_arg(L,1); SAFE(a);
+        float *b = float_new(L); SAFE(b);
+        *b = -(*a);
+	return 1;
+}
+
 static int float_sub(lua_State *L) {
 	float *a = float_arg(L,1); SAFE(a);
 	float *b = float_arg(L,2); SAFE(b);
@@ -203,6 +210,7 @@ int luaopen_float(lua_State *L) {
 		{"sub",float_sub},
 		{"mul",float_mul},
 		{"div",float_div},
+		{"opposite",float_opposite},
 		{"is_float",is_float},
 		{NULL,NULL}
 	};
