@@ -366,6 +366,7 @@ When("create the result of '' * ''", function(left,right)
 	local r = have(right)
 	empty 'result'
 	ACK.result, ZEN.CODEC.result = _math_op(_mul, l, r, BIG.zenmul)
+        I.spy(ZEN.CODEC.result)
 end)
 
 When("create the result of '' in '' * ''", function(left, dict, right)
@@ -515,6 +516,7 @@ local priorities = {['+'] = 0, ['-'] = 0, ['*'] = 1, ['/'] = 1, ['~'] = 2}
 When("create the result of ''", function(expr)
   local specials = {'(', ')'}
   local i, j
+  empty 'result'
   for k, v in pairs(priorities) do
     table.insert(specials, k)
   end
@@ -602,5 +604,18 @@ When("create the result of ''", function(expr)
   end
 
   ZEN.assert(#values == 1, "Invalid arithmetical expression", 2)
-  I.spy(values)
+  ACK.result = values[1]
+  if type(values[1]) == 'zenroom.big' then
+    ZEN.CODEC['result'] = new_codec('result',
+   		                    {encoding = 'zenroom.big',
+                                    luatype = 'userdata',
+                                    rawtype = 'zenroom.big',
+                                    zentype = 'element' })
+  elseif type(values[1]) == 'zenroom.float' then
+    ZEN.CODEC['result'] = new_codec('result',
+   		                    {encoding = 'zenroom.float',
+                                    luatype = 'userdata',
+                                    rawtype = 'zenroom.float',
+                                    zentype = 'element' })
+  end
 end)
