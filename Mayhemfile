@@ -1,0 +1,7 @@
+project: rnshah9/playground
+target: playground
+image: ghcr.io/rnshah9/playground:zenroom
+
+cmds:
+  - cmd: /usr/local/bin/zenroom @@
+    filepath: /test.lua
