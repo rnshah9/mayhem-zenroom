@@ -1,6 +1,6 @@
-project: rnshah9/mayhem-zenroom
+project: zenroom
 target: zenroom
 
 cmds:
-  - cmd: /usr/local/bin/zenroom @@
+  - cmd: /usr/local/bin/zenroom /test.lua
     filepath: /test.lua

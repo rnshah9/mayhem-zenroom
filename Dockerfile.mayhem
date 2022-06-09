@@ -1,7 +1,16 @@
-FROM alpine:latest
+FROM alpine:latest as builder
 
 RUN apk add --no-cache zsh linux-headers build-base cmake
 
 ADD . /
 RUN make linux
 RUN cp /src/zenroom /usr/local/bin/zenroom
+
+RUN mkdir -p /deps
+RUN ldd /usr/local/bin/zenroom | tr -s '[:blank:]' '\n' | grep '^/' | xargs -I % sh -c 'cp % /deps;'
+
+FROM alpine:latest as package
+
+COPY --from=builder /deps /deps
+COPY --from=builder /usr/local/bin/zenroom /usr/local/bin/zenroom
+ENV LD_LIBRARY_PATH=/deps
