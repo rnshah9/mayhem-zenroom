@@ -75,8 +75,6 @@
 
 #include <math.h> // for log2 in entropy calculation
 
-extern zenroom_t *Z;
-
 // from segwit_addr.c
 extern int segwit_addr_encode(char *output, const char *hrp, int witver, const uint8_t *witprog, size_t witprog_len);
 extern int segwit_addr_decode(int* witver, uint8_t* witdata, size_t* witdata_len, const char* hrp, const char* addr);
@@ -91,14 +89,10 @@ extern int b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz);
 extern int _ecp_to_octet(octet *o, ecp *e);
 extern int _ecp2_to_octet(octet *o, ecp2 *e);
 
-static int _max(int x, int y) { if(x > y) return x;	else return y; }
+static inline int _max(int x, int y) { if(x > y) return x;	else return y; }
 // static int _min(int x, int y) { if(x < y) return x;	else return y; }
 
-// takes a base string and calculated the maximum length of the
-// decoded string
 #include <ctype.h>
-static int getlen_base64(int len) {	return( ((3+(4*(len/3))) & ~0x03)+0x0f ); }
-// static int getlen_base58(int len) {	return( ((3+(5*(len/3))) & ~0x03)+0x0f ); }
 
 // assumes null terminated string
 // returns 0 if not base else length of base encoded string
@@ -170,11 +164,11 @@ int is_bin(const char *in) {
 // REMEMBER: newuserdata already pushes the object in lua's stack
 octet* o_new(lua_State *L, const int size) {
 	if(size<0) {
-		error(L, "Cannot create octet, size less than zero");
+		zerror(L, "Cannot create octet, size less than zero");
 		lerror(L, "execution aborted");
 		return NULL; }
 	if(size>MAX_OCTET) {
-		error(L, "Cannot create octet, size too big: %u", size);
+		zerror(L, "Cannot create octet, size too big: %u", size);
 		lerror(L, "execution aborted");
 		return NULL; }
 	octet *o = (octet *)lua_newuserdata(L, sizeof(octet));
@@ -201,7 +195,7 @@ octet* o_arg(lua_State *L,int n) {
 	o = (octet*) luaL_testudata(L, n, "zenroom.octet"); // new
 	if(o) {
 		if(o->len>MAX_OCTET) {
-			error(L, "argument %u octet too long: %u bytes",n,o->len);
+			zerror(L, "argument %u octet too long: %u bytes", n, o->len);
 			lerror(L, "operation aborted");
 			return NULL;
 		}
@@ -212,13 +206,13 @@ octet* o_arg(lua_State *L,int n) {
 		size_t len; const char *str;
 		str = luaL_optlstring(L,n,NULL,&len);
 		if(!str || !len) {
-			error(L, "invalid NULL string (zero size)");
-			lerror(L,"failed implicit conversion from string to octet");
+			zerror(L, "invalid NULL string (zero size)");
+			lerror(L, "failed implicit conversion from string to octet");
 			return 0;
 		}
 		if(!len || len>MAX_OCTET) {
-			error(L, "invalid string size: %u", len);
-			lerror(L,"failed implicit conversion from string to octet");
+			zerror(L, "invalid string size: %u", len);
+			lerror(L, "failed implicit conversion from string to octet");
 		return 0;
 		}
 		// fallback to a string
@@ -257,8 +251,8 @@ octet* o_arg(lua_State *L,int n) {
 	  lua_pop(L,1);
 	  return(o);
 	}
-	error(L,"Error in argument #%u",n);
-	lerror(L, "%s: cannot convert %s to zeroom.octet",__func__,luaL_typename(L,n));
+	zerror(L, "Error in argument #%u", n);
+	lerror(L, "%s: cannot convert %s to zeroom.octet", __func__, luaL_typename(L, n));
 	return NULL;
 	// if executing here, something is pushed into Lua's stack
 	// but this is an internal function to gather arguments, so
@@ -466,7 +460,7 @@ static int from_base64(lua_State *L) {
 	if(!len) {
 		lerror(L, "base64 string contains invalid characters");
 		return 0; }
-	int nlen = len + len + len; // getlen_base64(len);
+	int nlen = len + len + len;
 	octet *o = o_new(L, nlen); // 4 byte header
 	OCT_frombase64(o,(char*)s);
 	return 1;
@@ -518,7 +512,7 @@ static int from_string(lua_State *L) {
 	const int len = strlen(s);
 	// STRING SIZE CHECK before import to OCTET
 	if(len>MAX_OCTET) {
-		error(L, "%s: invalid string size: %u", __func__,len);
+		zerror(L, "%s: invalid string size: %u", __func__,len);
 		lerror(L, "operation aborted");
 		return 0; }
 	octet *o = o_new(L, len);
@@ -531,21 +525,21 @@ static int from_string(lua_State *L) {
 static int from_hex(lua_State *L) {
 	char *s = (char*)lua_tostring(L, 1);
 	if(!s) {
-		error(L, "%s :: invalid argument",__func__); // fatal
-		lua_pushboolean(L,0);
+		zerror(L, "%s :: invalid argument", __func__); // fatal
+		lua_pushboolean(L, 0);
 		return 1; }
 	int len;
 	if ( (s[0] == '0') && (s[1] == 'x') )
 	   	 len = is_hex(s+2);
 	else len = is_hex(s);
 	if(!len) {
-		error(L, "hex sequence invalid"); // fatal
-		lua_pushboolean(L,0);
+		zerror(L, "hex sequence invalid"); // fatal
+		lua_pushboolean(L, 0);
 		return 1; }
 	func(L,"hex string sequence length: %u",len);
 	if(!len || len>MAX_FILE<<1) { // *2 hex tuples
-		error(L, "hex sequence too long: %u bytes", len<<1); // fatal
-		lua_pushboolean(L,0);
+		zerror(L, "hex sequence too long: %u bytes", len<<1); // fatal
+		lua_pushboolean(L, 0);
 		return 1; }
 	octet *o = o_new(L, len>>1);
 	if ( (s[0] == '0') && (s[1] == 'x') ) {
@@ -553,6 +547,9 @@ static int from_hex(lua_State *L) {
 		if((len&1)==1) { // odd length means elision
 			s[1]='0'; // overwrite a single byte in const
 			o->len = hex2buf(o->val, s+1);
+			return 1;
+		} else {
+			o->len = hex2buf(o->val, s+2);
 			return 1;
 		}
 	}
@@ -567,7 +564,7 @@ static int from_bin(lua_State *L) {
 	luaL_argcheck(L, s != NULL, 1, "binary string sequence expected");
 	const int len = is_bin(s);
 	if(!len || len>MAX_FILE) {
-		error(L, "invalid binary sequence size: %u", len);
+		zerror(L, "invalid binary sequence size: %u", len);
 		lerror(L, "operation aborted");
 		return 0; }
 	octet *o = o_new(L, len+4); // destination
@@ -609,8 +606,8 @@ static int from_bin(lua_State *L) {
 static int from_segwit_address(lua_State *L) {
 	const char *s = lua_tostring(L, 1);
 	if(!s) {
-		error(L, "%s :: invalid argument",__func__); // fatal
-		lua_pushboolean(L,0);
+		zerror(L, "%s :: invalid argument", __func__); // fatal
+		lua_pushboolean(L, 0);
 		return 1; }
 	int witver;
 	uint8_t witprog[40];
@@ -622,8 +619,8 @@ static int from_segwit_address(lua_State *L) {
 		ret = segwit_addr_decode(&witver, witprog, &witprog_len, hrp, s);
 	}
 	if(!ret) {
-		error(L, "%s :: not bech32 address", __func__);
-		lua_pushboolean(L,0);
+		zerror(L, "%s :: not bech32 address", __func__);
+		lua_pushboolean(L, 0);
 		return 1;
 	}
 	octet *o = o_new(L, witprog_len);
@@ -657,17 +654,17 @@ static int to_segwit_address(lua_State *L) {
 	const char *s = lua_tostring(L, 3);
 	int err = 0;
 	if(!s) {
-		error(L, "%s :: invalid argument",__func__); // fatal
+		zerror(L, "%s :: invalid argument", __func__); // fatal
 		err = 1;
 	}
 
 	if(witver < 0 || witver > 16) {
-	        error(L, "Invalid segwit version: %d", witver);
+	        zerror(L, "Invalid segwit version: %d", witver);
 		err = 1;
 	}
 
 	if(o->len < 2 || o->len > 40) {
-	        error(L, "Invalid size for segwit address: %d", o->len);
+	        zerror(L, "Invalid size for segwit address: %d", o->len);
 		err = 1;
 	}
 
@@ -688,8 +685,8 @@ static int to_segwit_address(lua_State *L) {
 		i++;
 	}
 	hrp[i] = '\0';
-	if(s[i] != '\0' || (strncmp(hrp, "bc",2) != 0 && strncmp(hrp, "tb",2) != 0)) {
-	        error(L, "Invalid human readable part: %s", s);
+	if(s[i] != '\0' || (strncmp(hrp, "bc", 2) != 0 && strncmp(hrp, "tb", 2) != 0)) {
+	        zerror(L, "Invalid human readable part: %s", s);
 		err = 1;
 	}
 	if(err) {
@@ -699,8 +696,8 @@ static int to_segwit_address(lua_State *L) {
 	char *result = zen_memory_alloc(73+strlen(hrp));
 
 	if (!segwit_addr_encode(result, hrp, witver, (uint8_t*)o->val, o->len)) {
-		error(L, "%s :: cannot be encoded to segwit format", __func__);
-		lua_pushboolean(L,0);
+		zerror(L, "%s :: cannot be encoded to segwit format", __func__);
+		lua_pushboolean(L, 0);
 		zen_memory_free(result);
 		return 1;
         }
@@ -715,16 +712,16 @@ static int to_mnemonic(lua_State *L) {
 	octet *o = o_arg(L,1);	SAFE(o);
 	if(!o->len) { lua_pushnil(L); return 1; }
 	if(o->len > 32) {
-	  error(L, "%s :: octet bigger than 32 bytes cannot be encoded to mnemonic");
-	  lua_pushboolean(L,0);
+	  zerror(L, "%s :: octet bigger than 32 bytes cannot be encoded to mnemonic");
+	  lua_pushboolean(L, 0);
 	  return 0;
 	}
 	char *result = zen_memory_alloc(24 * 10);
 	if(mnemonic_from_data(result, o->val, o->len)) {
 		lua_pushstring(L, result);
 	} else {
-		error(L, "%s :: cannot be encoded to mnemonic", __func__);
-		lua_pushboolean(L,0);
+		zerror(L, "%s :: cannot be encoded to mnemonic", __func__);
+		lua_pushboolean(L, 0);
 	}
 	zen_memory_free(result);
 	return 1;
@@ -733,14 +730,14 @@ static int to_mnemonic(lua_State *L) {
 static int from_mnemonic(lua_State *L) {
 	const char *s = lua_tostring(L, 1);
 	if(!s) {
-		error(L, "%s :: invalid argument",__func__); // fatal
-		lua_pushboolean(L,0);
+		zerror(L, "%s :: invalid argument", __func__); // fatal
+		lua_pushboolean(L, 0);
 		return 1; }
 	// From bip39 it can be at most 32bytes
 	octet *o = o_new(L, 32);
 	if(!mnemonic_check_and_bits(s, &(o->len), o->val)) {
-		error(L, "%s :: words cannot be encoded with bip39 format", __func__);
-		lua_pushboolean(L,0);
+		zerror(L, "%s :: words cannot be encoded with bip39 format", __func__);
+		lua_pushboolean(L, 0);
 	}
 
 	return 1;
@@ -837,7 +834,7 @@ static int to_base64 (lua_State *L) {
 		lerror(L, "base64 cannot encode an empty string");
 		return 0; }
 	int newlen;
-	newlen = getlen_base64(o->len);
+	newlen = ((3+(4*(o->len/3))) & ~0x03)+0x0f;
 	char *b = zen_memory_alloc(newlen);
 	OCT_tobase64(b,o);
 	lua_pushstring(L,b);
@@ -1174,6 +1171,7 @@ static int new_random(lua_State *L) {
 	int tn;
 	lua_Number n = lua_tonumberx(L, 1, &tn); SAFE(n);
 	octet *o = o_new(L,(int)n); SAFE(o);
+	Z(L);
 	OCT_rand(o,Z->random_generator,(int)n);
 	return 1;
 }
@@ -1280,7 +1278,7 @@ static int bitshift_hamming_distance(lua_State *L) {
 	octet *right = o_arg(L,2); SAFE(right);
 	// same length of octets needed
 	if(left->len != right->len) {
-		error(L, "Cannot measure hamming distance of octets of different lengths");
+		zerror(L, "Cannot measure hamming distance of octets of different lengths");
 		lerror(L, "execution aborted");
 	}
 	distance = 0;
@@ -1293,6 +1291,21 @@ static int bitshift_hamming_distance(lua_State *L) {
 	}
 	lua_pushinteger(L,distance);
 	return 1;
+}
+
+static int charcount(lua_State *L) {
+  register char needle;
+  register const char *p;
+  register int count = 0;
+  register int c;
+  octet *o = o_arg(L,1); SAFE(o);
+  const char *s = lua_tostring(L, 2);
+  luaL_argcheck(L, s != NULL, 1, "string expected");
+  needle = *s; // single char
+  const char *hay = (const char*)o->val;
+  for(p=hay, c=0; c < o->len; p++, c++) if(needle==*p) count++;
+  lua_pushinteger(L,count);
+  return 1;
 }
 
 static int crc8(lua_State *L) {
@@ -1361,6 +1374,7 @@ int luaopen_octet(lua_State *L) {
 		{"random",  new_random},
 		{"entropy", entropy},
 		{"bytefreq", entropy_bytefreq},
+		{"charcount", charcount},
 		{"hamming", bitshift_hamming_distance},
 		{"popcount_hamming", popcount_hamming_distance},
 		{"to_segwit", to_segwit_address},
@@ -1392,7 +1406,7 @@ int luaopen_octet(lua_State *L) {
 		{"popcount_hamming", popcount_hamming_distance},
 		{"segwit", to_segwit_address},
 		{"mnemonic", to_mnemonic},
-
+		{"charcount", charcount},
 		// idiomatic operators
 		{"__len",size},
 		{"__concat",concat_n},
@@ -1402,6 +1416,6 @@ int luaopen_octet(lua_State *L) {
 		{"__tostring",to_base64},
 		{NULL,NULL}
 	};
-	zen_add_class("octet", octet_class, octet_methods);
+	zen_add_class(L, "octet", octet_class, octet_methods);
 	return 1;
 }

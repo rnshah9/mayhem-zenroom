@@ -28,14 +28,17 @@
 #include <stdarg.h>
 #include <lua.h>
 
+// macro to obtain Z context from a lua_State
+#define Z(l) zenroom_t *Z = NULL; if (l) { void *_zv; lua_getallocf(l, &_zv); Z = _zv; }
+
 int lerror(lua_State *L, const char *fmt, ...);
 // int zencode_traceback(lua_State *L);
 
-void notice(lua_State *L, const char *format, ...);
+void notice(void *L, const char *format, ...);
 void func(void *L, const char *format, ...);
-void error(lua_State *L, const char *format, ...);
-void act(lua_State *L, const char *format, ...);
-void warning(lua_State *L, const char *format, ...);
+void zerror(void *L, const char *format, ...);
+void act(void *L, const char *format, ...);
+void warning(void *L, const char *format, ...);
 
 // from stb_sprintf.h
 int z_sprintf(char *buf, char const *fmt, ...);
@@ -43,7 +46,7 @@ int z_snprintf(char *buf, int count, char const *fmt, ...);
 int z_vsprintf(char *buf, char const *fmt, va_list va);
 int z_vsnprintf(char *buf, int count, char const *fmt, va_list va);
 
-#define ERROR() error(0, "Error in %s",__func__)
+#define ERROR() zerror(0, "Error in %s",__func__)
 #define SAFE(x) if(!x) lerror(L, "NULL variable in %s",__func__)
 
 void set_debug(int lev);

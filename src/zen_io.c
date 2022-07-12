@@ -48,10 +48,7 @@ extern int SEMIHOSTING_STDOUT_FILENO;
 extern int write_to_console(const char* str);
 #endif
 
-extern zenroom_t *Z;
-extern int EXITCODE;
-
-int zen_write_err_va(const char *fmt, va_list va) {
+int zen_write_err_va(zenroom_t *Z, const char *fmt, va_list va) {
 	int res = 0;
 #ifdef __ANDROID__
 	res = __android_log_vprint(ANDROID_LOG_DEBUG, "ZEN", fmt, va);
@@ -63,7 +60,7 @@ int zen_write_err_va(const char *fmt, va_list va) {
 	if(!Z) res = vfprintf(stderr,fmt,va); // no init yet, print to stderr
 	if(!res && Z->stderr_buf) { // print to configured buffer
 		if(Z->stderr_full) {
-			error(Z->lua, "Error buffer full, log message lost");
+			zerror(Z->lua, "Error buffer full, log message lost");
 			return(0);
 		}
 		size_t max = Z->stderr_len - Z->stderr_pos;
@@ -72,12 +69,14 @@ int zen_write_err_va(const char *fmt, va_list va) {
 			 Z->stderr_len - Z->stderr_pos,  // length max
 			 fmt, va);
 		if(res < 0) {
-			error(Z->lua, "Fatal error writing error buffer: %s", strerror(errno));
-			EXITCODE = -1;
-			return(EXITCODE);
+
+			zerror(Z->lua, "Fatal error writing error buffer: %s", strerror(errno));
+			Z->exitcode = ERR_GENERIC;
+			return(Z->exitcode);
+
 		}
 		if(res > (int)max) {
-			error(Z->lua, "Error buffer too small, log truncated: %u bytes (max %u)",res, max);
+			zerror(Z->lua, "Error buffer too small, log truncated: %u bytes (max %u)", res, max);
 			Z->stderr_full = 1;
 			Z->stderr_pos += max;
 		} else {
@@ -95,12 +94,12 @@ int zen_write_err_va(const char *fmt, va_list va) {
 	return(res);
 }
 
-int zen_write_out_va(const char *fmt, va_list va) {
+int zen_write_out_va(zenroom_t *Z, const char *fmt, va_list va) {
 	int res = 0;
 	if(!Z) res = vfprintf(stdout,fmt,va); // no init yet, print to stdout
 	if(!res && Z->stdout_buf) { // print to configured buffer
 		if(Z->stdout_full) {
-			error(Z->lua, "Output buffer full, result data lost");
+			zerror(Z->lua, "Output buffer full, result data lost");
 			return(0);
 		}
 		size_t max = Z->stdout_len - Z->stdout_pos;
@@ -109,12 +108,14 @@ int zen_write_out_va(const char *fmt, va_list va) {
 			 Z->stdout_len - Z->stdout_pos,  // length max
 			 fmt, va);
 		if(res < 0) {
-			error(Z->lua, "Fatal error writing output buffer: %s", strerror(errno));
-			EXITCODE = -1;
-			return(EXITCODE);
+
+			zerror(Z->lua, "Fatal error writing output buffer: %s", strerror(errno));
+			Z->exitcode = ERR_GENERIC;
+			return(Z->exitcode);
+
 		}
 		if(res > (int)max) {
-			error(Z->lua, "Output buffer too small, data truncated: %u bytes (max %u)",res, max);
+			zerror(Z->lua, "Output buffer too small, data truncated: %u bytes (max %u)", res, max);
 			Z->stdout_full = 1;
 			Z->stdout_pos += max;
 		} else {
@@ -136,7 +137,7 @@ int zen_write_out_va(const char *fmt, va_list va) {
 	// return len;
 }
 
-int zen_write_err(const char *fmt, ...) {
+int zen_write_err(zenroom_t *Z, const char *fmt, ...) {
 // #ifdef __ANDROID__
 // 	// __android_log_print(ANDROID_LOG_VERBOSE, "KZK", "%s -- %s", pfx, msg);
 // 	// __android_log_print(ANDROID_LOG_VERBOSE, "KZK", fmt, va); // TODO: test
@@ -144,12 +145,12 @@ int zen_write_err(const char *fmt, ...) {
 	va_list arg;
 	size_t len;
 	va_start(arg,fmt);
-	len = zen_write_err_va(fmt,arg);
+	len = zen_write_err_va(Z, fmt,arg);
 	va_end(arg);
 	return len;
 }
 
-int zen_write_out(const char *fmt, ...) {
+int zen_write_out(zenroom_t *Z, const char *fmt, ...) {
 // #ifdef __ANDROID__
 // 	// __android_log_print(ANDROID_LOG_VERBOSE, "KZK", "%s -- %s", pfx, msg);
 // 	// __android_log_print(ANDROID_LOG_VERBOSE, "KZK", fmt, va); // TODO: test
@@ -157,14 +158,14 @@ int zen_write_out(const char *fmt, ...) {
 	va_list arg;
 	size_t len;
 	va_start(arg,fmt);
-	len = zen_write_out_va(fmt,arg);
+	len = zen_write_out_va(Z, fmt,arg);
 	va_end(arg);
 	return len;
 }
 
 // passes the string to be printed through the 'tostring'
 // meta-function configured in Lua, taking care of conversions
-static const char *lua_print_format(lua_State *L,
+const char *lua_print_format(lua_State *L,
 		int pos, size_t *len) {
 	const char *s;
 	lua_pushvalue(L, -1);  /* function to be called */
@@ -182,7 +183,7 @@ static const char *lua_print_format(lua_State *L,
 // configured so calling function can decide if to proceed with other
 // prints (stdout) or not
 static int lua_print_stdout_tobuf(lua_State *L, char newline) {
-	SAFE(Z);
+	Z(L);
 	if(Z->stdout_buf && (Z->stdout_pos < Z->stdout_len)) {
 		int i;
 		int n = lua_gettop(L);  /* number of arguments */
@@ -192,9 +193,9 @@ static int lua_print_stdout_tobuf(lua_State *L, char newline) {
 		for (i=1; i<=n; i++) {
 			s = lua_print_format(L, i, &len);
 			if(i>1) 
-				zen_write_out("\t%s%c",s,newline);
+				zen_write_out(Z, "\t%s%c",s,newline);
 			else
-				zen_write_out("%s%c",s,newline);
+				zen_write_out(Z, "%s%c",s,newline);
 			lua_pop(L, 1);
 		}
 		return 1;
@@ -203,7 +204,7 @@ static int lua_print_stdout_tobuf(lua_State *L, char newline) {
 }
 
 static int lua_print_stderr_tobuf(lua_State *L, char newline) {
-	SAFE(Z);
+	Z(L);
 	if(Z->stderr_buf && (Z->stderr_pos < Z->stderr_len)) {
 		int i;
 		int n = lua_gettop(L);  /* number of arguments */
@@ -213,9 +214,9 @@ static int lua_print_stderr_tobuf(lua_State *L, char newline) {
 		for (i=1; i<=n; i++) {
 			s = lua_print_format(L, i, &len);
 			if(i>1) 
-				zen_write_err("\t%s%c",s,newline);
+				zen_write_err(Z, "\t%s%c",s,newline);
 			else
-				zen_write_err("%s%c",s,newline);
+				zen_write_err(Z, "%s%c",s,newline);
 			lua_pop(L, 1);
 		}
 		return 1;
@@ -289,6 +290,7 @@ static int zen_warn (lua_State *L) {
 	size_t len = 0;
 	int n = lua_gettop(L);  /* number of arguments */
 	int i;
+	Z(L);
 	lua_getglobal(L, "tostring");
 	out[0] = '['; out[1] = 'W';	out[2] = ']'; out[3] = ' ';	pos = 4;
 	for (i=1; i<=n; i++) {
@@ -307,6 +309,7 @@ static int zen_act (lua_State *L) {
 	size_t len = 0;
 	int n = lua_gettop(L);  /* number of arguments */
 	int i;
+	Z(L);
 	lua_getglobal(L, "tostring");
 	out[0] = ' '; out[1] = '.';	out[2] = ' '; out[3] = ' ';	pos = 4;
 	for (i=1; i<=n; i++) {
@@ -540,6 +543,7 @@ static int zen_fatal(lua_State *L) {
 
 int zen_zstd_compress(lua_State *L) {
   octet *dst, *src;
+  Z(L);
   if(!Z->zstd_c)
     Z->zstd_c = ZSTD_createCCtx();
   src = o_arg(L, 1); SAFE(src);
@@ -558,12 +562,13 @@ int zen_zstd_compress(lua_State *L) {
 
 int zen_zstd_decompress(lua_State *L) {
   octet *src, *dst;
-  size_t res;
+  Z(L);
   if(!Z->zstd_d)
     Z->zstd_d = ZSTD_createDCtx();
   src = o_arg(L, 1); SAFE(src);
   dst = o_new(L, src->len * 3); // assuming max bound is *3
   SAFE(dst);
+  func(L, "decompressing octet: %u", src->len);
   dst->len = ZSTD_decompressDCtx(Z->zstd_d,
 		      dst->val, dst->max,
 		      src->val, src->len);
@@ -575,6 +580,27 @@ int zen_zstd_decompress(lua_State *L) {
   return 1;
 }
 
+static int zen_random_seed(lua_State *L) {
+  Z(L);
+  octet *seed = o_arg(L, 1); SAFE(seed);
+  if(seed->len <4) {
+    fprintf(stderr,"Random seed error: too small (%u bytes)\n",seed->len);
+    zen_fatal(L);
+  }
+  AMCL_(RAND_seed)(Z->random_generator, seed->len, seed->val);
+  // fast-forward to runtime_random (256 bytes) and 4 bytes lua
+  octet *rr = o_new(L, PRNG_PREROLL); SAFE(rr);
+  for(register int i=0;i<PRNG_PREROLL;i++)
+    rr->val[i] = RAND_byte(Z->random_generator);
+  rr->len = PRNG_PREROLL;
+  // plus 4 bytes used by Lua init
+  RAND_byte(Z->random_generator);
+  RAND_byte(Z->random_generator);
+  RAND_byte(Z->random_generator);
+  RAND_byte(Z->random_generator);
+  // return "runtime random" fingerprint
+  return 1;
+}
 void zen_add_io(lua_State *L) {
 	// override print() and io.write()
 	static const struct luaL_Reg custom_print [] =
@@ -587,6 +613,7 @@ void zen_add_io(lua_State *L) {
 		  {"act", zen_act},
 		  {"compress", zen_zstd_compress},
 		  {"decompress", zen_zstd_decompress},
+		  {"random_seed", zen_random_seed},
 		  {NULL, NULL} };
 	lua_getglobal(L, "_G");
 	luaL_setfuncs(L, custom_print, 0);  // for Lua versions 5.2 or greater

@@ -53,8 +53,6 @@ extern const chunk *ORDER;
 //  @license AGPLv3
 //  @copyright Dyne.org foundation 2017-2018
 
-extern zenroom_t *Z;
-
 extern int octet_to_hex(lua_State *L);
 
 extern ecp* ecp_dup(lua_State *L, ecp* in);
@@ -74,7 +72,7 @@ extern ecp* ecp_dup(lua_State *L, ecp* in);
 	if   (r->doublesize)     _r = r->dval; \
 	else { dcopy(lr,r->val); _r = (chunk*)&lr; }
 
-// error(L,"error in %s %u",__FUNCTION__,__LINE__);
+// zerror(L, "error in %s %u", __FUNCTION__, __LINE__);
 
 #define checkalldouble(l,r) \
 	if(!l->val && !l->dval) { \
@@ -206,7 +204,7 @@ int big_init(big *n) {
 		func(NULL,"ignoring superflous initialization of big");
 		return(1); }
 	if(n->dval || n->doublesize) {
-		error(NULL,"cannot shrink double big to big in re-initialization");
+		zerror(NULL, "cannot shrink double big to big in re-initialization");
 		return 0; }
 	if(!n->val && !n->dval) {
 		size_t size = sizeof(BIG);
@@ -215,7 +213,7 @@ int big_init(big *n) {
 		n->len = MODBYTES;
 		return(size);
 	}
-	error(NULL,"anomalous state of big number detected on initialization");
+	zerror(NULL, "anomalous state of big number detected on initialization");
 	return(-1);
 }
 int dbig_init(big *n) {
@@ -237,7 +235,7 @@ int dbig_init(big *n) {
 		n->len = MODBYTES<<1;
 		return(size);
 	}
-	error(NULL,"anomalous state of double big number detected on initialization");
+	zerror(NULL, "anomalous state of double big number detected on initialization");
 	return(-1);
 }
 
@@ -284,6 +282,7 @@ static int newbig(lua_State *L) {
 		big *res = big_new(L); big_init(res); SAFE(res);
 		// random with modulus
 		big *modulus = (big*)ud; SAFE(modulus);
+		Z(L);
 		BIG_randomnum(res->val,modulus->val,Z->random_generator);
 		return 1;
 	}
@@ -304,7 +303,7 @@ static int newbig(lua_State *L) {
 	// octet argument, import
 	octet *o = o_arg(L, 1); SAFE(o);
 	if(o->len > MODBYTES) {
-		error(L, "Import of octet to BIG limit exceeded (%u > %u bytes)", o->len, MODBYTES);
+		zerror(L, "Import of octet to BIG limit exceeded (%u > %u bytes)", o->len, MODBYTES);
 		return 0; }
 	big *c = big_new(L); SAFE(c);
 	_octet_to_big(L, c,o);
@@ -373,7 +372,7 @@ static int big_from_decimal_string(lua_State *L) {
 
 		//if (!isdigit(s[i])) {
 		if (s[i] < '0' || s[i] > '9') {
-			error(L, "%s: string is not a number %s", __func__, s);
+			zerror(L, "%s: string is not a number %s", __func__, s);
 			lerror(L, "operation aborted");
 			return 0;
 		}
@@ -682,6 +681,7 @@ static int big_modsub(lua_State *L) {
 static int big_modrand(lua_State *L) {
 	big *modulus = big_arg(L,1); SAFE(modulus);	
 	big *res = big_new(L); big_init(res); SAFE(res);
+	Z(L);
 	BIG_randomnum(res->val,modulus->val,Z->random_generator);
 	return(1);
 }
@@ -695,6 +695,7 @@ static int big_modrand(lua_State *L) {
 
 static int big_random(lua_State *L) {
 	big *res = big_new(L); big_init(res); SAFE(res);
+	Z(L);
 	BIG_randomnum(res->val,(chunk*)CURVE_Order,Z->random_generator);
 	return(1);
 }
@@ -782,9 +783,9 @@ static int big_monty(lua_State *L) {
 	if(!s->doublesize) {
 		lerror(L,"no need for montgomery reduction: not a double big number");
 		return 0; }
-	big *m = big_arg(L,2); SAFE(m);
+	big *m = big_arg(L, 2); SAFE(m);
 	if(m->doublesize) {
-		lerror(L,"double big modulus in montgomery reduction");
+		lerror(L, "double big modulus in montgomery reduction");
 		return 0; }
 	big *d = big_new(L); big_init(d); SAFE(d);
 	BIG_monty(d->val, m->val, Montgomery, s->dval);
@@ -792,29 +793,29 @@ static int big_monty(lua_State *L) {
 }
 
 static int big_mod(lua_State *L) {
-	big *l = big_arg(L,1); SAFE(l);
-	big *r = big_arg(L,2); SAFE(r);
+	big *l = big_arg(L, 1); SAFE(l);
+	big *r = big_arg(L, 2); SAFE(r);
 	if(r->doublesize) {
-		lerror(L,"modulus cannot be a double big (dmod)");
+		lerror(L, "modulus cannot be a double big (dmod)");
 		return 0; }
 	if(l->doublesize) {
 		big *d = big_new(L); big_init(d); SAFE(d);
 		DBIG t; BIG_dcopy(t, l->dval); // dmod destroys 2nd arg
 		BIG_dmod(d->val, t, r->val);
 	} else {
-		big *d = big_dup(L,l); SAFE(d);
-		BIG_mod(d->val,r->val);
+		big *d = big_dup(L, l); SAFE(d);
+		BIG_mod(d->val, r->val);
 	}
 	return 1;
 }
 
 static int big_div(lua_State *L) {
-	big *l = big_arg(L,1); SAFE(l);
-	big *r = big_arg(L,2); SAFE(r);
+	big *l = big_arg(L, 1); SAFE(l);
+	big *r = big_arg(L, 2); SAFE(r);
 	if(r->doublesize) {
-		lerror(L,"division not supported with double big modulus");
+		lerror(L, "division not supported with double big modulus");
 		return 0; }
-	big *d = big_dup(L,l); SAFE(d);
+	big *d = big_dup(L, l); SAFE(d);
 	if(l->doublesize) { // use ddiv on double big
 		DBIG t; BIG_dcopy(t, l->dval); 	// in ddiv the 2nd arg is destroyed
 		BIG_ddiv(d->val, t, r->val);
@@ -839,11 +840,11 @@ static int big_modmul(lua_State *L) {
 	big *n = luaL_testudata(L, 3, "zenroom.big");
 	if(n) {
 		if(y->doublesize || z->doublesize || n->doublesize) {
-			lerror(L,"modmul not supported on double big numbers");
+			lerror(L, "modmul not supported on double big numbers");
 			return 0; }
 		BIG t1, t2;
-		BIG_copy(t1,y->val);
-		BIG_copy(t2,z->val);
+		BIG_copy(t1, y->val);
+		BIG_copy(t2, z->val);
 		big *x = big_new(L); SAFE(x);
 		big_init(x);
 		BIG_modmul(x->val, t1, t2, n->val);
@@ -852,8 +853,8 @@ static int big_modmul(lua_State *L) {
 	} else {
 		// modulo default ORDER from ECP
 		BIG t1, t2;
-		BIG_copy(t1,y->val);
-		BIG_copy(t2,z->val);
+		BIG_copy(t1, y->val);
+		BIG_copy(t2, z->val);
 		big *x = big_new(L); SAFE(x);
 		big_init(x);
 		BIG_modmul(x->val, t1, t2, (chunk*)CURVE_Order);
@@ -867,10 +868,10 @@ static int big_moddiv(lua_State *L) {
 	big *div = big_arg(L, 2); SAFE(div);
 	big *mod = big_arg(L, 3); SAFE(mod);
 	if(y->doublesize || div->doublesize || mod->doublesize) {
-		lerror(L,"moddiv not supported on double big numbers");
+		lerror(L, "moddiv not supported on double big numbers");
 		return 0; }
 	BIG t;
-	BIG_copy(t,y->val);
+	BIG_copy(t, y->val);
 	big *x = big_new(L); SAFE(x);
 	big_init(x);
 	BIG_moddiv(x->val, t, div->val, mod->val);
@@ -882,10 +883,10 @@ static int big_modsqr(lua_State *L) {
 	big *y = big_arg(L, 1); SAFE(y);
 	big *n = big_arg(L, 2); SAFE(n);
 	if(y->doublesize || n->doublesize) {
-		lerror(L,"modsqr not supported on double big numbers");
+		lerror(L, "modsqr not supported on double big numbers");
 		return 0; }
 	BIG t;
-	BIG_copy(t,y->val);
+	BIG_copy(t, y->val);
 	big *x = big_new(L); SAFE(x);
 	big_init(x);
 	BIG_modsqr(x->val, t, n->val);
@@ -897,10 +898,10 @@ static int big_modneg(lua_State *L) {
 	big *y = big_arg(L, 1); SAFE(y);
 	big *n = big_arg(L, 2); SAFE(n);
 	if(y->doublesize || n->doublesize) {
-		lerror(L,"modneg not supported on double big numbers");
+		lerror(L, "modneg not supported on double big numbers");
 		return 0; }
 	BIG t;
-	BIG_copy(t,y->val);
+	BIG_copy(t, y->val);
 	big *x = big_new(L); SAFE(x);
 	big_init(x);
 	BIG_modneg(x->val, t, n->val);
@@ -911,7 +912,7 @@ static int big_jacobi(lua_State *L) {
 	big *x = big_arg(L, 1); SAFE(x);
 	big *y = big_arg(L, 2); SAFE(y);
 	if(x->doublesize || y->doublesize) {
-		lerror(L,"jacobi not supported on double big numbers");
+		lerror(L, "jacobi not supported on double big numbers");
 		return 0; }
 	lua_pushinteger(L, BIG_jacobi(x->val, y->val));
 	return 1;
@@ -933,16 +934,16 @@ static int big_parity(lua_State *L) {
 }
 
 static int big_shiftr(lua_State *L) {
-        big *c = big_arg(L,1); SAFE(c);
+        big *c = big_arg(L, 1); SAFE(c);
 	int i;
-	lua_Number n = lua_tointegerx(L,2,&i);
+	lua_Number n = lua_tointegerx(L, 2, &i);
 	if(!i) {
 		lerror(L, "the number of bits to shift has to be a number");
 		return 0;
 	}
 	int int_n = n;
   
-	big *r = big_dup(L,c); SAFE(r);
+	big *r = big_dup(L, c); SAFE(r);
 	if(c->doublesize) {
 		BIG_dnorm(r->val);
 		BIG_dshr(r->val, int_n);
@@ -957,70 +958,70 @@ static int big_shiftr(lua_State *L) {
 int luaopen_big(lua_State *L) {
 	(void)L;
 	const struct luaL_Reg big_class[] = {
-		{"new",newbig},
-		{"to_octet",luabig_to_octet},
-		{"from_decimal",big_from_decimal_string},
-		{"eq",big_eq},
-		{"add",big_add},
-		{"sub",big_sub},
-		{"mul",big_mul},
-		{"mod",big_mod},
-		{"div",big_div},
-		{"sqr",big_sqr},
-		{"bits",big_bits},
-		{"bytes",big_bytes},
-		{"modmul",big_modmul},
-		{"moddiv",big_moddiv},
-		{"modsqr",big_modsqr},
-		{"modneg",big_modneg},
-		{"modsub",big_modsub},
-		{"modrand",big_modrand},
-		{"random",big_random},
-		{"modinv",big_modinv},
-		{"jacobi",big_jacobi},
-		{"monty",big_monty},
-		{"parity",big_parity},
-		{"info",lua_biginfo},
-		{"max",lua_bigmax},
-		{"shr",big_shiftr},
-		{NULL,NULL}
+		{"new", newbig},
+		{"to_octet", luabig_to_octet},
+		{"from_decimal", big_from_decimal_string},
+		{"eq", big_eq},
+		{"add", big_add},
+		{"sub", big_sub},
+		{"mul", big_mul},
+		{"mod", big_mod},
+		{"div", big_div},
+		{"sqr", big_sqr},
+		{"bits", big_bits},
+		{"bytes", big_bytes},
+		{"modmul", big_modmul},
+		{"moddiv", big_moddiv},
+		{"modsqr", big_modsqr},
+		{"modneg", big_modneg},
+		{"modsub", big_modsub},
+		{"modrand", big_modrand},
+		{"random", big_random},
+		{"modinv", big_modinv},
+		{"jacobi", big_jacobi},
+		{"monty", big_monty},
+		{"parity", big_parity},
+		{"info", lua_biginfo},
+		{"max", lua_bigmax},
+		{"shr", big_shiftr},
+		{NULL, NULL}
 	};
 	const struct luaL_Reg big_methods[] = {
 		// idiomatic operators
-		{"octet",luabig_to_octet},
-		{"hex",big_to_hex},
-		{"decimal",big_to_decimal_string},
-		{"__add",big_add},
-		{"__sub",big_sub},
-		{"__mul",big_mul},
-		{"__mod",big_mod},
-		{"__div",big_div},
-		{"__eq",big_eq},
-		{"__lt",big_lt},
-		{"__lte",big_lte},
-		{"__concat",big_concat},
-		{"bits",big_bits},
-		{"bytes",big_bytes},
-		{"int",big_to_int},
-		{"integer",big_to_int},
-		{"__len",big_bytes},
-		{"sqr",big_sqr},
-		{"modmul",big_modmul},
-		{"moddiv",big_moddiv},
-		{"modsqr",big_modsqr},
-		{"modneg",big_modneg},
-		{"modsub",big_modsub},
-		{"modinv",big_modinv},
-		{"modpower",big_modpower},
-		{"jacobi",big_jacobi},
-		{"monty",big_monty},
-		{"parity",big_parity},
+		{"octet", luabig_to_octet},
+		{"hex", big_to_hex},
+		{"decimal", big_to_decimal_string},
+		{"__add", big_add},
+		{"__sub", big_sub},
+		{"__mul", big_mul},
+		{"__mod", big_mod},
+		{"__div", big_div},
+		{"__eq", big_eq},
+		{"__lt", big_lt},
+		{"__lte", big_lte},
+		{"__concat", big_concat},
+		{"bits", big_bits},
+		{"bytes", big_bytes},
+		{"int", big_to_int},
+		{"integer", big_to_int},
+		{"__len", big_bytes},
+		{"sqr", big_sqr},
+		{"modmul", big_modmul},
+		{"moddiv", big_moddiv},
+		{"modsqr", big_modsqr},
+		{"modneg", big_modneg},
+		{"modsub", big_modsub},
+		{"modinv", big_modinv},
+		{"modpower", big_modpower},
+		{"jacobi", big_jacobi},
+		{"monty", big_monty},
+		{"parity", big_parity},
 		{"__gc", big_destroy},
-		{"__tostring",big_to_hex},
-		{"fixed",big_to_fixed_octet},
+		{"__tostring", big_to_hex},
+		{"fixed", big_to_fixed_octet},
 		{"__shr", big_shiftr},
-		{NULL,NULL}
+		{NULL, NULL}
 	};
-	zen_add_class("big", big_class, big_methods);
+	zen_add_class(L, "big", big_class, big_methods);
 	return 1;
 }

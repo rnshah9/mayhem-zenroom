@@ -47,6 +47,10 @@ ldadd += ${pwd}/lib/pqclean/libqpz.a
 # zstd settings
 ldadd += ${pwd}/lib/zstd/libzstd.a
 
+#-----------------
+# ed25519 settings
+ldadd += ${pwd}/lib/ed25519-donna/libed25519.a
+
 # ------------------------
 # target specific settings
 
@@ -86,7 +90,7 @@ system := Generic
 ldadd += -lm
 cflags_protection := ""
 cflags := ${cflags_protection} -DARCH_CORTEX -mcpu=cortex-m3 -mthumb -mlittle-endian -mthumb-interwork -Wstack-usage=1024 -DLIBRARY -Wno-main -ffreestanding -nostartfiles -specs=nano.specs -specs=nosys.specs
-milagro_cmake_flags += -DCMAKE_SYSTEM_PROCESSOR="arm" -DCMAKE_CROSSCOMPILING=1 -DCMAKE_C_COMPILER_WORKS=1
+milagro_cmake_flags += -DCMAKE_SYSTEM_PROCESSOR="arm" -DCMAKE_CROSSCOMPILING=1 -DCMAKE_C_COMPILER_WORKS=1 -DBUILD_TESTING=0
 ldflags+=-mcpu=cortex-m3 -mthumb -mlittle-endian -mthumb-interwork -Wstack-usage=1024 -Wno-main -ffreestanding -T cortex_m.ld -nostartfiles -Wl,-gc-sections -ggdb
 endif
 
@@ -136,6 +140,7 @@ ifneq (,$(findstring linux,$(MAKECMDGOALS)))
 cflags := ${cflags} -fPIC ${cflags_protection} -D'ARCH=\"LINUX\"' -DARCH_LINUX
 ldflags := -lm -lpthread
 system := Linux
+cflags += $(if ${COMPILE_LUA}, -DLUA_COMPILED)
 endif
 
 ifneq (,$(findstring clang,$(MAKECMDGOALS)))
@@ -247,6 +252,7 @@ endif
 
 ifneq (,$(findstring debug,$(MAKECMDGOALS)))
 cflags := -Og -ggdb -DDEBUG=1 -Wall -Wextra -pedantic
+cflags += $(if ${COMPILE_LUA}, -DLUA_COMPILED)
 endif
 
 ifneq (,$(findstring profile,$(MAKECMDGOALS)))

@@ -41,9 +41,9 @@ crypto-tests = \
 	${1} test/hash.lua && \
 	${1} test/ecdh.lua && \
 	${1} test/dh_session.lua && \
-	${1} test/nist/aes_gcm.lua && \
-	${1} test/nist/aes_cbc.lua && \
-	${1} test/nist/aes_ctr.lua && \
+	${1} test/crypto_nist/aes_gcm.lua && \
+	${1} test/crypto_nist/aes_cbc.lua && \
+	${1} test/crypto_nist/aes_ctr.lua && \
 	${1} test/ecp_generic.lua && \
 	${1} test/elgamal.lua && \
 	${1} test/bls_pairing.lua && \
@@ -58,9 +58,9 @@ cortex-m-crypto-tests = \
 	${1}test/hash.lua && \
 	${1}test/ecdh.lua && \
 	${1}test/dh_session.lua && \
-	${1}test/nist/aes_gcm.lua && \
-	${1}test/nist/aes_cbc.lua && \
-	${1}test/nist/aes_ctr.lua && \
+	${1}test/crypto_nist/aes_gcm.lua && \
+	${1}test/crypto_nist/aes_cbc.lua && \
+	${1}test/crypto_nist/aes_ctr.lua && \
 	${1}test/ecp_generic.lua && \
 	${1}test/elgamal.lua && \
 	${1}test/bls_pairing.lua && \
@@ -75,11 +75,13 @@ cortex-m-zencode-integration = \
 	cd test/zencode_given && ./run.sh ${1}; cd -; \
 	cd test/zencode_cookbook && ./run-all.sh ${1}; cd -; \
 	cd test/zencode_numbers && ./run.sh ${1}; cd -; \
+	cd test/zencode_random && ./run.sh ${1}; cd -; \
 	cd test/zencode_array && ./run.sh ${1}; cd -; \
 	cd test/zencode_dictionary && ./run.sh ${1}; cd -; \
 	cd test/zencode_hash && ./run.sh ${1}; cd -; \
 	cd test/zencode_http && ./run.sh ${1}; cd -; \
 	cd test/zencode_ecdh && ./run.sh ${1}; cd -; \
+	cd test/zencode_eddsa && ./run.sh ${1}; cd -; \
 	cd test/zencode_secshare && ./run.sh ${1}; cd -; \
 	cd test/zencode_credential && ./run.sh ${1}; cd -; \
 	cd test/zencode_petition && ./run.sh ${1}; cd -;
@@ -89,9 +91,10 @@ cortex-m-crypto-integration = \
 	test/integration_asymmetric_crypto.sh ${1}
 
 crypto-integration = \
-	test/octet-json.sh ${1} && \
-	cd test/nist && ./run.sh ../../${1}; cd -; \
-	test/integration_asymmetric_crypto.sh ${1}
+	cd test/crypto_json &&  ./run.sh ${1}; cd -; \
+	cd test/crypto_ecdh &&  ./run.sh ${1}; cd -; \
+	cd test/crypto_eddsa && ./run.sh ${1}; cd -; \
+	cd test/crypto_nist &&  ./run.sh ${1}; cd -;
 
 # TODO: complete with tamale and date
 lua-modules = \
@@ -106,6 +109,7 @@ zencode-integration = \
 	cd test/zencode_array && ./run.sh; cd -; \
 	cd test/zencode_hash && ./run.sh; cd -; \
 	cd test/zencode_ecdh && ./run.sh; cd -; \
+	cd test/zencode_eddsa && ./run.sh; cd -; \
 	cd test/zencode_credential && ./run.sh; cd -; \
 	cd test/zencode_petition && ./run.sh; cd -; \
 	cd test/zencode_reflow && ./run.sh; cd -;

@@ -77,10 +77,6 @@ static const struct sock_fprog  strict = {
 
 #endif
 
-extern zenroom_t *Z;
-
-
-
 extern int zen_setenv(lua_State *L, char *key, char *val);
 
 // This function exits the process on failure.
@@ -90,35 +86,35 @@ void load_file(char *dst, FILE *fd) {
 	size_t offset = 0;
 	size_t bytes = 0;
 	if(!fd) {
-		error(0, "Error opening %s", strerror(errno));
+		zerror(0, "Error opening %s", strerror(errno));
 		exit(1); }
 	if(fd!=stdin) {
 		if(fseek(fd, 0L, SEEK_END)<0) {
-			error(0, "fseek(end) error in %s: %s",__func__,
+			zerror(0, "fseek(end) error in %s: %s", __func__,
 			      strerror(errno));
 			exit(1); }
 		file_size = ftell(fd);
 		if(fseek(fd, 0L, SEEK_SET)<0) {
-			error(0, "fseek(start) error in %s: %s",__func__,
+			zerror(0, "fseek(start) error in %s: %s", __func__,
 			      strerror(errno));
 			exit(1); }
-		func(0, "size of file: %u",file_size);
+		func(0, "size of file: %u", file_size);
 	}
 
 	firstline = malloc(MAX_STRING);
 	// skip shebang on firstline
 	if(!fgets(firstline, MAX_STRING, fd)) {
 		if(errno==0) { // file is empty
-			error(0, "Error reading, file is empty");
+			zerror(0, "Error reading, file is empty");
 			if(firstline) free(firstline);
 			exit(1); }
-		error(0, "Error reading first line: %s", strerror(errno));
+		zerror(0, "Error reading first line: %s", strerror(errno));
 		exit(1); }
 	if(firstline[0]=='#' && firstline[1]=='!')
 		func(0, "Skipping shebang");
 	else {
 		offset+=strlen(firstline);
-		strncpy(dst,firstline,MAX_STRING);
+		strncpy(dst, firstline, MAX_STRING);
 	}
 
 	size_t chunk;
@@ -143,7 +139,7 @@ void load_file(char *dst, FILE *fd) {
 				break;
 			}
 			if(ferror(fd)) {
-				error(0, "Error in %s: %s",__func__,strerror(errno));
+				zerror(0, "Error in %s: %s", __func__, strerror(errno));
 				fclose(fd);
 				if(firstline) free(firstline);
 				exit(1); }
@@ -206,6 +202,8 @@ int main(int argc, char **argv) {
 	int use_seccomp = 0;
 	cli_alloc_buffers();
 
+	zenroom_t *Z;
+
 	const char *short_options = "hD:ic:k:a:l:S:pz";
 	const char *help          =
 		"Usage: zenroom [-h] [-s] [ -D scenario ] [ -i ] [ -c config ] [ -k keys ] [ -a data ] [ -S seed ] [ -p ] [ -z ] [ -l lib ] [ script.lua ]\n";
@@ -222,11 +220,6 @@ int main(int argc, char **argv) {
 	// conf[0] = '\0';
 	script[0] = '\0';
 	int verbosity = 1;
-#if defined(ARCH_WIN)
-	set_color(0);
-#else
-	set_color(1);
-#endif
 	while((opt = getopt(argc, argv, short_options)) != -1) {
 		switch(opt) {
 		case 'D':
@@ -262,8 +255,8 @@ int main(int argc, char **argv) {
 			zencode = 1;
 			interactive = 0;
 			break;
-		case '?': error(0,help); cli_free_buffers(); return EXIT_FAILURE;
-		default:  error(0,help); cli_free_buffers(); return EXIT_FAILURE;
+		case '?': zerror(0, help); cli_free_buffers(); return EXIT_FAILURE;
+		default:  zerror(0, help); cli_free_buffers(); return EXIT_FAILURE;
 		}
 	}
 
@@ -300,7 +293,7 @@ int main(int argc, char **argv) {
 	if(interactive) {
 		////////////////////////////////////
 		// start an interactive repl console
-		zen_init(
+		Z = zen_init(
 			conffile[0]?conffile:NULL,
 			keys[0]?keys:NULL,
 			data[0]?data:NULL);
@@ -336,7 +329,7 @@ int main(int argc, char **argv) {
 			(keys[0])?keys:NULL,
 			(data[0])?data:NULL);
 	if(!Z) {
-		error(NULL, "Initialisation failed.");
+		zerror(NULL, "Initialisation failed.");
 		cli_free_buffers();
 		return EXIT_FAILURE; }
 
@@ -366,9 +359,9 @@ int main(int argc, char **argv) {
 		               "  Schemas = ZEN.schemas }))", introspect, introspect);
 		int ret = luaL_dostring(Z->lua, zscript);
 		if(ret) {
-			error(Z->lua, "Zencode execution error");
-			error(Z->lua, "Script:\n%s", zscript);
-			error(Z->lua, "%s", lua_tostring(Z->lua, -1));
+			zerror(Z->lua, "Zencode execution error");
+			zerror(Z->lua, "Script:\n%s", zscript);
+			zerror(Z->lua, "%s", lua_tostring(Z->lua, -1));
 			fflush(stderr);
 		}
 		zen_teardown(Z);
@@ -380,6 +373,7 @@ int main(int argc, char **argv) {
 		notice(Z->lua,"Side loading library: %s",sideload);
 		load_file(sidescript, fopen(sideload,"rb"));
 		zen_exec_script(Z, sidescript);
+		// TODO: detect error
 	}
 
 	if(scriptfile[0]!='\0') {
@@ -403,41 +397,48 @@ int main(int argc, char **argv) {
 
 #if (defined(ARCH_WIN) || defined(DISABLE_FORK)) || defined(ARCH_CORTEX) || defined(ARCH_BSD)
 	if(zencode)
-		if( zen_exec_zencode(Z, script) ) { cli_free_buffers(); return EXIT_FAILURE; }
+		zen_exec_zencode(Z, script);
 	else
-		if( zen_exec_script(Z, script) ) { cli_free_buffers(); return EXIT_FAILURE; }
+		zen_exec_script(Z, script);
 
 #else /* POSIX */
 	if (!use_seccomp) {
 		if(zencode) {
-			if( zen_exec_zencode(Z, script) ) { cli_free_buffers(); return EXIT_FAILURE; }
+			zen_exec_zencode(Z, script);
 		} else {
-			if( zen_exec_script(Z, script) ) { cli_free_buffers(); return EXIT_FAILURE; }
+			zen_exec_script(Z, script);
 		}
 	} else {
 		act(NULL, "protected mode (seccomp isolation) activated");
 		if (fork() == 0) {
 #   ifdef ARCH_LINUX /* LINUX engages SECCOMP. */
 			if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
-				error(Z->lua, "Seccomp fail to set no_new_privs: %s", strerror(errno));
+
+				zerror(Z->lua, "Seccomp fail to set no_new_privs: %s", strerror(errno));
+				zen_teardown(Z);
+
 				cli_free_buffers();
 				return EXIT_FAILURE;
 			}
 			if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &strict)) {
-				error(Z->lua, "Seccomp fail to install filter: %s", strerror(errno));
+
+				zerror(Z->lua, "Seccomp fail to install filter: %s", strerror(errno));
+				zen_teardown(Z);
+
 				cli_free_buffers();
 				return EXIT_FAILURE;
 			}
 #   endif /* ARCH_LINUX */
 			if(verbosity) act(NULL, "starting execution.");
+			int exitcode;
 			if(zencode) {
-				if( zen_exec_zencode(Z, script) ) { cli_free_buffers(); return EXIT_FAILURE; }
+				exitcode = zen_exec_zencode(Z, script);
 			} else {
-				if( zen_exec_script(Z, script) ) { cli_free_buffers(); return EXIT_FAILURE; }
+				exitcode = zen_exec_script(Z, script);
 			}
 			zen_teardown(Z);
 			cli_free_buffers();
-			return EXIT_SUCCESS;
+			return exitcode;
 		}
 		do {
 			pid = wait(&status);
@@ -452,7 +453,7 @@ int main(int argc, char **argv) {
 		}
 	}
 #endif /* POSIX */
-
+	int exitcode = Z->exitcode;
 	zen_teardown(Z);
 
 	{
@@ -463,7 +464,7 @@ int main(int argc, char **argv) {
 	}
 
 	cli_free_buffers();
-	return EXIT_SUCCESS;
+	return exitcode;
 }
 
 #endif // LIBRARY

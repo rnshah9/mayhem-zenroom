@@ -16,7 +16,7 @@
 #  along with this program.  If not, see
 #  <http://www.gnu.org/licenses/>.
 
-ZENROOM_VERSION := 2.0.0
+ZENROOM_VERSION := 3.0.0
 CC ?= gcc
 # ARCH := $(shell uname -m)
 BRANCH := $(shell git symbolic-ref HEAD | sed -e 's,.*/\(.*\),\1,')
@@ -26,6 +26,7 @@ CFLAGS  += -I. -I../lib/lua53/src \
 	-I../lib/milagro-crypto-c/build/include \
 	-I../lib/milagro-crypto-c/include \
 	-I../lib/zstd \
+	-I../lib/ed25519-donna \
 	-Wall -Wextra
 
 CMSIS := ../lib/cmsis
@@ -47,7 +48,7 @@ SOURCES := \
 	zen_octet.o zen_ecp.o zen_ecp2.o zen_big.o \
 	zen_fp12.o zen_random.o zen_hash.o \
 	zen_ecdh_factory.o zen_ecdh.o \
-	zen_aes.o zen_qp.o \
+	zen_aes.o zen_qp.o zen_ed.o \
 	randombytes.o \
 	cortex_m.o
 
@@ -83,6 +84,7 @@ lib-static: ${SOURCES}
 	ar x ${MILIB}/libamcl_curve_${ECDH}.a
 	ar x ${MILIB}/libamcl_core.a
 	ar x ../lib/zstd/libzstd.a
+	ar x ../lib/ed25519-donna/libed25519.a
 	${AR} rcs libzenroom-${ARCH}.a *.o
 
 luarock: ${SOURCES}

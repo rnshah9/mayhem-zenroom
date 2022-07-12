@@ -8,6 +8,8 @@ pwd := $(shell pwd)
 PREFIX ?= /usr/local
 # VERSION is set in src/Makefile
 VERSION := $(shell awk '/ZENROOM_VERSION :=/ { print $$3; exit }' src/Makefile | tee VERSION)
+# Targets to be build in this order
+BUILDS := apply-patches milagro lua53 embed-lua zstd quantum-proof ed25519-donna
 
 # DESTDIR is supported by install target
 
@@ -35,6 +37,7 @@ sonarqube:
 	cp -v build/sonar-project.properties .
 	./build/sonarqube.sh
 
+embed-lua: lua_embed_opts := $(if ${COMPILE_LUA}, compile)
 embed-lua:
 	@echo "Embedding all files in src/lua"
 	./build/embed-lualibs ${lua_embed_opts}
@@ -147,8 +150,17 @@ zstd:
 	ZSTD_LEGACY_SUPPORT=0 \
 	HUF_FORCE_DECOMPRESS_X1=1 \
 	ZSTD_FORCE_DECOMPRESS_SEQUENCES_SHORT=1 \
-	ZSTD_STRIP_ERROR_STRINGS=1 \
+	ZSTD_STRIP_ERROR_STRINGS=0 \
 	ZSTD_NO_INLINE=1
+
+# TODO: move into a makefile inside the lib
+ed25519-donna:
+	echo "-- Building ED25519 for EDDSA"
+	CC=${gcc} \
+	AR=${ar} \
+	CFLAGS="${cflags}" \
+	LDFLAGS="${ldflags}" \
+	make -C ${pwd}/lib/ed25519-donna
 
 # -------------------
 # Test suites for all platforms

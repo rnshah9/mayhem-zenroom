@@ -64,14 +64,12 @@
 // #include <ecp_SECP256K1.h>
 #include <zen_big.h>
 
-#define KEYPROT(alg,key)	  \
-	error(L, "%s engine has already a %s set:",alg,key); \
+#define KEYPROT(alg, key)	  \
+	zerror(L, "%s engine has already a %s set:", alg, key); \
 	lerror(L, "Zenroom won't overwrite. Use a .new() instance.");
 
 // from zen_ecdh_factory.h to setup function pointers
 extern void ecdh_init(ecdh *e);
-
-extern zenroom_t *Z; // accessed to check random_seed configuration
 
 ecdh ECDH;
 
@@ -120,6 +118,7 @@ static int ecdh_keygen(lua_State *L) {
 	lua_setfield(L, -2, "public");
 	octet *sk = o_new(L,ECDH.fieldsize); SAFE(sk);
 	lua_setfield(L, -2, "private");
+	Z(L);
 	(*ECDH.ECP__KEY_PAIR_GENERATE)(Z->random_generator,sk,pk);
 	return 1;
 }
@@ -271,6 +270,7 @@ static int ecdh_dsa_sign(lua_State *L) {
 		lua_setfield(L, -2, "r");
 		octet *s = o_new(L,max_size); SAFE(s);
 		lua_setfield(L, -2, "s");
+		Z(L);
 		(*ECDH.ECP__SP_DSA)( max_size, Z->random_generator, NULL, sk, m, r, s);
 	} else {
 		octet *k = o_arg(L,3); SAFE(k);
@@ -310,7 +310,7 @@ static int ecdh_dsa_sign_hashed(lua_State *L) {
 		ERROR(); lerror(L,"missing 3rd argument: byte size of octet to sign");
 	}
 	if (m->len != (int)n) {
-		ERROR(); error(L,"size of input does not match: %u != %u", m->len, (int)n);
+		ERROR(); zerror(L, "size of input does not match: %u != %u", m->len, (int)n);
 	}
 	if(lua_isnoneornil(L, 4)) {
 		// return a table
@@ -320,6 +320,7 @@ static int ecdh_dsa_sign_hashed(lua_State *L) {
 		octet *s = o_new(L,(int)n); SAFE(s);
 		lua_setfield(L, -2, "s");
 		// Size of a big256 used with SECP256k1
+		Z(L);
 		(*ECDH.ECP__SP_DSA_NOHASH)((int)n, Z->random_generator, NULL, sk, m, r, s, &parity);
 	} else {
 		octet *k = o_arg(L,4); SAFE(k);
@@ -398,7 +399,7 @@ static int ecdh_dsa_verify_hashed(lua_State *L) {
 		ERROR(); lerror(L,"invalid size zero for material to sign");
 	}
 	if (m->len != (int)n) {
-		ERROR(); error(L,"size of input does not match: %u != %u", m->len, (int)n);
+		ERROR(); zerror(L, "size of input does not match: %u != %u", m->len, (int)n);
 	}
 	int res = (*ECDH.ECP__VP_DSA_NOHASH)((int)n, pk, m, r, s);
 	if(res <0) // ECDH_INVALID in milagro/include/ecdh.h.in (!?!)
@@ -437,15 +438,15 @@ static int ecdh_aead_encrypt(lua_State *L) {
 	octet *k =  o_arg(L, 1); SAFE(k);
         // AES key size nk can be 16, 24 or 32 bytes
 	if(k->len > 32 || k->len < 16) {
-		error(L,"ECDH.aead_encrypt accepts only keys of 16,24,32, this is %u", k->len);
-		lerror(L,"ECDH encryption aborted");
+		zerror(L, "ECDH.aead_encrypt accepts only keys of 16, 24, 32, this is %u", k->len);
+		lerror(L, "ECDH encryption aborted");
 		return 0; }
 	octet *in = o_arg(L, 2); SAFE(in);
 
 	octet *iv = o_arg(L, 3); SAFE(iv);
         if (iv->len < 12) {
-		error(L,"ECDH.aead_encrypt accepts an iv of 12 bytes minimum, this is %u", iv->len);
-		lerror(L,"ECDH encryption aborted");
+		zerror(L, "ECDH.aead_encrypt accepts an iv of 12 bytes minimum, this is %u", iv->len);
+		lerror(L, "ECDH encryption aborted");
 		return 0; }
 
 	octet *h =  o_arg(L, 4); SAFE(h);
@@ -475,16 +476,16 @@ static int ecdh_aead_decrypt(lua_State *L) {
 	HERE();
 	octet *k = o_arg(L, 1); SAFE(k);
 	if(k->len > 32 || k->len < 16) {
-		error(L,"ECDH.aead_decrypt accepts only keys of 16,24,32, this is %u", k->len);
-		lerror(L,"ECDH decryption aborted");
+		zerror(L, "ECDH.aead_decrypt accepts only keys of 16, 24, 32, this is %u", k->len);
+		lerror(L, "ECDH decryption aborted");
 		return 0; }
 
 	octet *in = o_arg(L, 2); SAFE(in);
 
 	octet *iv = o_arg(L, 3); SAFE(iv);
         if (iv->len < 12) {
-		error(L,"ECDH.aead_decrypt accepts an iv of 12 bytes minimum, this is %u", iv->len);
-		lerror(L,"ECDH decryption aborted");
+		zerror(L, "ECDH.aead_decrypt accepts an iv of 12 bytes minimum, this is %u", iv->len);
+		lerror(L, "ECDH decryption aborted");
 		return 0; }
 
 	octet *h = o_arg(L, 4); SAFE(h);
@@ -504,15 +505,93 @@ static int ecdh_aead_decrypt(lua_State *L) {
    @return BIG with the order
 */
 static int ecdh_order(lua_State *L) {
-        if(!ECDH.order || ECDH.order_size <= 0) {
+        if(!ECDH.order || ECDH.mod_size <= 0) {
 		lerror(L, "%s: ECDH order not implemented", __func__);
                 return 0;
         }
 	big *o = big_new(L); SAFE(o);
         big_init(o);
-        BIG_fromBytesLen(o->val, ECDH.order, ECDH.order_size);
+        BIG_fromBytesLen(o->val, ECDH.order, ECDH.mod_size);
 	return 1;
 }
+
+/**
+   Modulus of the curve underlying the ECDH implementation
+
+   @function ECDH.prime()
+   @return BIG with the modulus
+*/
+static int ecdh_prime(lua_State *L) {
+        if(!ECDH.prime || ECDH.mod_size <= 0) {
+		lerror(L, "%s: ECDH modulus not implemented", __func__);
+                return 0;
+        }
+	big *p = big_new(L); SAFE(p);
+        big_init(p);
+        BIG_fromBytesLen(p->val, ECDH.prime, ECDH.mod_size);
+	return 1;
+}
+
+/**
+   Cofactor of the curve underlying the ECDH implementation
+
+   @function ECDH.cofactor()
+   @return int with the cofactor
+*/
+static int ecdh_cofactor(lua_State *L) {
+        if(!ECDH.cofactor) {
+		lerror(L, "%s: ECDH cofactor not implemented", __func__);
+                return 0;
+        }
+	lua_pushinteger(L, ECDH.cofactor);
+	return 1;
+}
+
+/**
+   Elliptic Curve Digital Signature Algorithm (ECDSA) recovery function.
+   This method is intended to be used over all the possible point (x,y)
+   that create the ephemeral public key of the signature, i.e.
+   x can be equal to r+j*n where j is in [0,..,h] (h cofactor of the curve),
+   n is the order of the curve and r is the first component of the signature.
+   While y is uniquely identified by its parity.
+   This method, if it exists, will output a public key Q for which (r, s)
+   is a valid signature on the hashed message m.
+
+   @param x the x coordinate of the ephemeral public key
+   @param y_parity parity of y coordinate of the ephemeral public key
+   @param m hashed message
+   @param sig the signature (r,s)
+   @return[1] the recoverd public key in a compressed form
+   @return[2] 1 if the above public key is valid, 0 otherwise
+*/
+static int ecdh_dsa_recovery(lua_State *L) {
+	octet *x = o_arg(L, 1); SAFE(x);
+	int i;
+	lua_Number y = lua_tointegerx(L, 2, &i);
+	if(!i) {
+		lerror(L, "parity of y coordinate has to be a integer");
+		return 0;
+	}
+	octet *m = o_arg(L, 3); SAFE(m);
+	octet *r = NULL;
+	octet *s = NULL;
+	if(lua_type(L, 4) == LUA_TTABLE) {
+		lua_getfield(L, 4, "r");
+		lua_getfield(L, 4, "s");
+		r = o_arg(L, -2); SAFE(r);
+		s = o_arg(L, -1); SAFE(s);
+	} else {
+		ERROR(); lerror(L, "signature argument invalid: not a table");
+	}
+	octet *pk = o_new(L, ECDH.fieldsize*2 +1); SAFE(pk);
+
+	if( !(*ECDH.ECP__PUBLIC_KEY_RECOVERY)(x, (int)y, m, r, s, pk) )
+		lua_pushboolean(L, 1);
+	else
+		lua_pushboolean(L, 0);
+	return 2;
+}
+
 extern int ecdh_add(lua_State *L);
 
 int luaopen_ecdh(lua_State *L) {
@@ -521,6 +600,8 @@ int luaopen_ecdh(lua_State *L) {
 		{"keygen",ecdh_keygen},
 		{"pubgen",ecdh_pubgen},
 		{"order",ecdh_order},
+		{"prime",ecdh_prime},
+		{"cofactor",ecdh_cofactor},
 		{"aead_encrypt",   ecdh_aead_encrypt},
 		{"aead_decrypt",   ecdh_aead_decrypt},
 		{"aesgcm_encrypt", ecdh_aead_encrypt},
@@ -535,6 +616,7 @@ int luaopen_ecdh(lua_State *L) {
 		{"verify", ecdh_dsa_verify},
 		{"sign_hashed", ecdh_dsa_sign_hashed},
 		{"verify_hashed", ecdh_dsa_verify_hashed},
+		{"recovery", ecdh_dsa_recovery},
 		{"public_xy", ecdh_pub_xy},
 		{"pubxy", ecdh_pub_xy},
 		{"add", ecdh_add},
@@ -547,6 +629,6 @@ int luaopen_ecdh(lua_State *L) {
 
 	ecdh_init(&ECDH);
 
-	zen_add_class("ecdh", ecdh_class, ecdh_methods);
+	zen_add_class(L, "ecdh", ecdh_class, ecdh_methods);
 	return 1;
 }

@@ -22,8 +22,7 @@
 // valid configurations:
 //
 // debug=1..3
-// color=1,0
-// rngseed=hex:[256 bytes in hex notation]
+// rngseed=hex:[256 bits in hex notation]
 // print=sys|stb|mutt
 ///////////////////////
 
@@ -70,20 +69,11 @@
 #define STB_C_LEXER_IMPLEMENTATION
 
 extern void set_debug(int lev);
-extern void set_color(int on);
 
 #include <zenroom.h>
-#include <zen_memory.h>
 #include <zen_error.h>
-#include <zen_config.h>
 
 #include <stb_c_lexer.h>
-
-typedef enum { NIL, VERBOSE, COLOR, RNGSEED, PRINTF } zconf;
-static zconf curconf;
-
-char zconf_rngseed[(RANDOM_SEED_LEN*2)+4]; // 0x and terminating \0
-printftype zconf_printf = LIBC;
 
 int zen_conf_parse(zenroom_t *ZZ, const char *configuration) {
 	(void)stb__strchr;            // avoid compiler warnings
@@ -93,13 +83,15 @@ int zen_conf_parse(zenroom_t *ZZ, const char *configuration) {
 	if(len<3) return 0;
 	stb_lexer lex;
 	char lexbuf[MAX_CONFIG];
+	zconf curconf = NIL;
+	// ZZ->zconf_rngseed[0] = '\0';
+	// ZZ->zconf_printf = LIBC;
+
 	// char *lexbuf = (char*)malloc(MAX_CONFIG);
 	stb_c_lexer_init(&lex, configuration, configuration+len, lexbuf, MAX_CONFIG);
-	zconf_rngseed[0] = '\0'; // set zero rngseed as config flag
-	curconf = NIL;
 	while (stb_c_lexer_get_token(&lex)) {
 		if (lex.token == CLEX_parse_error) {
-			error(NULL,"%s: error parsing configuration: %s", __func__, configuration);
+			zerror(NULL, "%s: error parsing configuration: %s", __func__, configuration);
 			// free(lexbuf);
 			return 0;
 		}
@@ -110,34 +102,33 @@ int zen_conf_parse(zenroom_t *ZZ, const char *configuration) {
 		case CLEX_id:
 			if(strcasecmp(lex.string,"debug")  ==0) { curconf = VERBOSE; break; } // bool
 			if(strcasecmp(lex.string,"verbose")==0) { curconf = VERBOSE; break; }
-			if(strcasecmp(lex.string,"color")  ==0) { curconf = COLOR;   break; } // bool
 			if(strcasecmp(lex.string,"rngseed")  ==0) { curconf = RNGSEED;   break; } // str
 			if(strcasecmp(lex.string,"print") ==0) { curconf = PRINTF;   break; } // str
 			if(curconf==RNGSEED) {
 				int len = strlen(lex.string);
 				if( len-4 != RANDOM_SEED_LEN *2) { // hex doubles size
-					error(NULL,"Invalid length of random seed: %u (must be %u)",
+					zerror(NULL, "Invalid length of random seed: %u (must be %u)",
 					      len/2, RANDOM_SEED_LEN);
 					// free(lexbuf);
 					return 0;
 				}
 				if(strncasecmp(lex.string, "hex:", 4) != 0) { // hex: prefix needed
-					error(NULL,"Invalid rngseed data prefix (must be hex:)");
+					zerror(NULL, "Invalid rngseed data prefix (must be hex:)");
 					// free(lexbuf);
 					return 0;
 				}
 				// copy string and null terminate
-				memcpy(zconf_rngseed, lex.string+4, RANDOM_SEED_LEN*2);
-				zconf_rngseed[(RANDOM_SEED_LEN*2)] = 0x0;
+				memcpy(ZZ->zconf_rngseed, lex.string+4, RANDOM_SEED_LEN*2);
+				ZZ->zconf_rngseed[(RANDOM_SEED_LEN*2)] = 0x0;
 				break;
 			}
 
 			if(curconf==PRINTF) {
-				if(strcasecmp(lex.string,"stb") == 0) zconf_printf = STB;
-				else if(strcasecmp(lex.string,"sys") == 0) zconf_printf = SYS;
-				else if(strcasecmp(lex.string,"mutt") == 0) zconf_printf = MUTT;
+				if(strcasecmp(lex.string,"stb") == 0) ZZ->zconf_printf = STB;
+				else if(strcasecmp(lex.string,"sys") == 0) ZZ->zconf_printf = LIBC;
+				else if(strcasecmp(lex.string,"mutt") == 0) ZZ->zconf_printf = MUTT;
 				else {
-					error(NULL,"Invalid print function: %s",lex.string);
+					zerror(NULL, "Invalid print function: %s", lex.string);
 					// free(lexbuf);
 					return 0;
 				}
@@ -145,26 +136,24 @@ int zen_conf_parse(zenroom_t *ZZ, const char *configuration) {
 			}
 
 			// free(lexbuf);
-			error(NULL,"Invalid configuration: %s", lex.string);
+			zerror(NULL, "Invalid configuration: %s", lex.string);
 			curconf = NIL;
 			return 0;
 
 		case CLEX_intlit:
 			if(curconf==VERBOSE) { ZZ->debuglevel = lex.int_number; break; }
-			if(curconf==COLOR)   { set_color  ( lex.int_number ); break; }
-
 			// free(lexbuf);
-			error(NULL,"Invalid integer configuration");
+			zerror(NULL, "Invalid integer configuration");
 			curconf = NIL;
 			return 0;
 
 		default:
 			if(lex.token == ',') { curconf = NIL; break; }
 			if(lex.token == '=' && curconf == NIL) {
-				warning(NULL,"Undefined config variable");
+				warning(NULL, "Undefined config variable");
 				break; }
 			if(lex.token == '=' && curconf != NIL) break; // OK
-			error(NULL,"%s: Invalid string in configuration: %c",__func__, lex.token);
+			zerror(NULL, "%s: Invalid string in configuration: %c", __func__, lex.token);
 			// free(lexbuf);
 			return 0;
 		}

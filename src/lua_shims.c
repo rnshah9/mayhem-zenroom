@@ -27,10 +27,12 @@
 #include <lauxlib.h>
 #include <ldo.h>
 
-extern int EXITCODE;
+#include <zenroom.h>
+#include <zen_error.h>
 
 void lua_fatal(lua_State *L) {
-	EXITCODE = 1;
+  Z(L);
+	Z->exitcode = -1;
 	luaD_throw(L, LUA_ERRRUN);
 }
 
@@ -39,7 +41,7 @@ typedef struct LoadS {
 	const char *s;
 	size_t size;
 } LoadS;
-static const char *getS (lua_State *L, void *ud, size_t *size) {
+const char *getS (lua_State *L, void *ud, size_t *size) {
 	LoadS *ls = (LoadS *)ud;
 	(void)L;  /* not used */
 	if (ls->size == 0) return NULL;
@@ -48,10 +50,10 @@ static const char *getS (lua_State *L, void *ud, size_t *size) {
 	return ls->s;
 }
 // moved from lua's liolib.c
-static const luaL_Reg iolib[] = {
+const luaL_Reg iolib[] = {
 	{NULL, NULL}
 };
-static const luaL_Reg flib[] = {
+const luaL_Reg flib[] = {
 	{NULL, NULL}
 };
 static void createmeta (lua_State *L) {
@@ -88,7 +90,7 @@ typedef struct LoadF {
 } LoadF;
 
 
-static const char *getF (lua_State *L, void *ud, size_t *size) {
+const char *getF (lua_State *L, void *ud, size_t *size) {
   LoadF *lf = (LoadF *)ud;
   (void)L;  /* not used */
   if (lf->n > 0) {  /* are there pre-read characters to be read? */

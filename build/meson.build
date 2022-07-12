@@ -12,7 +12,8 @@ project(
 
 add_project_arguments(
     '-DVERSION="' + meson.project_version() + '"',
-    '-D_POSIX_C_SOURCE=199309',
+    '-D_POSIX_C_SOURCE=200112L',
+    '-D_DARWIN_C_SOURCE',
     language: 'c'
 )
 
@@ -20,7 +21,7 @@ if host_machine.system() == 'darwin'
     arch = 'OSX'
 elif host_machine.system() == 'linux'
     arch = 'LINUX'
-elif host_machine.system() == 'linux'
+else
     arch = 'BSD'
 endif
 add_project_arguments(
@@ -40,6 +41,7 @@ add_project_link_arguments(
     'liblua.a',
     'libzstd.a',
     'libqpz.a',
+    'libed25519.a',
     language: 'c'
 )
 
@@ -52,6 +54,8 @@ milagro_generated_include_dirs = include_directories('milagro-crypto-c/include')
 zstd_include_dirs = include_directories('../lib/zstd')
 
 lua_include_dirs = include_directories('../lib/lua53/src')
+
+ed25519_include_dirs = include_directories('../lib/ed25519-donna')
 
 zenroom_src = [
     '../src/base58.c',
@@ -71,6 +75,7 @@ zenroom_src = [
     '../src/zen_config.c',
     '../src/zen_ecdh.c',
     '../src/zen_qp.c',
+    '../src/zen_ed.c',
     '../src/zen_ecp2.c',
     '../src/zen_ecp.c',
     '../src/zen_error.c',
@@ -93,6 +98,7 @@ zenroom_lib = library(
         milagro_include_dirs,
         milagro_generated_include_dirs,
         zstd_include_dirs,
+	ed25519_include_dirs,
         lua_include_dirs,
     ],
     install: true,
@@ -108,6 +114,7 @@ zenroom_dep = declare_dependency(
         milagro_include_dirs,
         milagro_generated_include_dirs,
         zstd_include_dirs,
+	ed25519_include_dirs,
         lua_include_dirs,
     ],
 )
@@ -158,9 +165,9 @@ lua_tests = [
     'test/hash.lua',
     'test/ecdh.lua',
     'test/dh_session.lua',
-    'test/nist/aes_gcm.lua',
-    'test/nist/aes_cbc.lua',
-    'test/nist/aes_ctr.lua',
+    'test/crypto_nist/aes_gcm.lua',
+    'test/crypto_nist/aes_cbc.lua',
+    'test/crypto_nist/aes_ctr.lua',
     'test/ecp_generic.lua',
     'test/elgamal.lua',
     'test/bls_pairing.lua',
@@ -178,6 +185,7 @@ test_dir = meson.source_root() + '/../test/'
 
 zencode_tests = [
     'zencode_numbers',
+    'zencode_random',
     'zencode_array',
     'zencode_branching',
     'zencode_given',
@@ -188,6 +196,7 @@ zencode_tests = [
     'zencode_keys',
     'zencode_secshare',
     'zencode_ecdh',
+    'zencode_eddsa',
     'zencode_credential',
     'zencode_petition',
     'zencode_bitcoin',
@@ -212,14 +221,36 @@ foreach zencode_test : zencode_tests
     )
 endforeach
 
-zencode_cookbook_script = find_program(test_dir + 'zencode_cookbook/run.sh')
+crypto_tests = [
+  'crypto_nist',
+  'crypto_json',
+  'crypto_ecdh',
+  'crypto_eddsa',
+]
+foreach crypto_test : crypto_tests
+    test_script = find_program(test_dir + crypto_test + '/run.sh')
+    test(crypto_test, test_script, env: [
+            'ZENROOM=' + zenroom_exe.full_path(),
+        ], workdir: test_dir + crypto_test)
+endforeach
+
+
+# cookbook compared with different print routines
+zencode_cookbook_script = find_program(test_dir + 'zencode_cookbook/run-all.sh')
+test( 'zencode_cookbook print=sys', zencode_cookbook_script,
+    env: [ 'ZENROOM=' + zenroom_exe.full_path(), 'PRINT=mutt' ],
+    workdir: test_dir + 'zencode_cookbook')
+test( 'zencode_cookbook print=mutt', zencode_cookbook_script,
+    env: [ 'ZENROOM=' + zenroom_exe.full_path(), 'PRINT=mutt' ],
+    workdir: test_dir + 'zencode_cookbook')
+test( 'zencode_cookbook print=stb', zencode_cookbook_script,
+    env: [ 'ZENROOM=' + zenroom_exe.full_path(), 'PRINT=mutt' ],
+    workdir: test_dir + 'zencode_cookbook')
+
+
 # test( 'zencode_cookbook memmanager=lw', zencode_cookbook_script,
 #     env: [ 'ZENROOM=' + zenroom_exe.full_path(), 'MEMMANAGER=lw' ],
 #     workdir: test_dir + 'zencode_cookbook')
 # test( 'zencode_cookbook print=stb', zencode_cookbook_script,
 #     env: [ 'ZENROOM=' + zenroom_exe.full_path(), 'PRINT=stb' ],
 #     workdir: test_dir + 'zencode_cookbook')
-test( 'zencode_cookbook print=mutt', zencode_cookbook_script,
-    env: [ 'ZENROOM=' + zenroom_exe.full_path(), 'PRINT=mutt' ],
-    workdir: test_dir + 'zencode_cookbook')
-

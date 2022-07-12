@@ -53,11 +53,6 @@
 #include <zen_memory.h>
 #include <randombytes.h>
 
-extern zenroom_t *Z;
-// small buffer pre-filled with random, used at runtime by some
-// internal functions esp. to wipe out memory (lstring.c)
-uint8_t runtime_random256[256];
-
 void* rng_alloc(zenroom_t *ZZ) {
 	HERE();
 	RNG *rng = (RNG*)malloc(sizeof(csprng));
@@ -67,7 +62,7 @@ void* rng_alloc(zenroom_t *ZZ) {
 
 	// random seed provided externally 
 	if(ZZ->random_external) {
-		act(ZZ->lua,"Random seed is external, deterministic execution");
+		act(NULL,"Random seed is external, deterministic execution");
 #ifndef ARCH_CORTEX
 	} else {
 		// gather system random using randombytes()
@@ -90,12 +85,14 @@ void* rng_alloc(zenroom_t *ZZ) {
 
 
 static int rng_uint8(lua_State *L) {
+	Z(L);
 	uint8_t res = RAND_byte(Z->random_generator);
 	lua_pushinteger(L, (lua_Integer)res);
 	return(1);
 }
 
 static int rng_uint16(lua_State *L) {
+	Z(L);
 	uint16_t res =
 		RAND_byte(Z->random_generator)
 		| (uint32_t) RAND_byte(Z->random_generator) << 8;
@@ -104,6 +101,7 @@ static int rng_uint16(lua_State *L) {
 }
 
 static int rng_int32(lua_State *L) {
+	Z(L);
 	uint32_t res =
 		RAND_byte(Z->random_generator)
 		| (uint32_t) RAND_byte(Z->random_generator) << 8
@@ -114,12 +112,13 @@ static int rng_int32(lua_State *L) {
 }
 
 static int rng_rr256(lua_State *L) {
+  Z(L);
 	lua_newtable(L);
-	int c = 256;
+	int c = PRNG_PREROLL;
 	int idx = 0;
 	while(c--) {
 		lua_pushnumber(L,idx+1);
-		lua_pushinteger(L,(lua_Integer) runtime_random256[idx]);
+		lua_pushinteger(L,(lua_Integer) Z->runtime_random256[idx]);
 		lua_settable(L,-3);
 		idx++;
 	}
@@ -140,12 +139,13 @@ void zen_add_random(lua_State *L) {
 	lua_getglobal(L, "_G");
 	luaL_setfuncs(L, rng_base, 0);
 	lua_pop(L, 1);
-
+	Z(L);
 	{ // pre-fill runtime_random
 		// used in
 		register int i;
-		register uint8_t *p = runtime_random256;
-		for(i=0;i<256;i++,p++) *p = RAND_byte(Z->random_generator);
+		register char *p = Z->runtime_random256;
+		for(i=0;i<PRNG_PREROLL;i++,p++)
+		  *p = RAND_byte(Z->random_generator);
 	}
 
 }

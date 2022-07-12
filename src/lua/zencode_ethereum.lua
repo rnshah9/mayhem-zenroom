@@ -85,8 +85,15 @@ ZEN.add_schema(
 			      export = O.to_hex },
       ethereum_address = { import = O.from_hex,
 			   export = O.to_hex },
-      ethereum_nonce = function(obj)
-	 return ZEN.get(obj, '.', INT.new, tonumber) end,
+      -- TODO generic import from string in zenroom.big,
+      -- if a number begins with 0x import it as hex
+      -- otherwise as decimal (here we have to use tonumber
+      -- in order to contemplate hex strings)
+      ethereum_nonce = { import = function(o)
+			   local n = tonumber(o)
+			   ZEN.assert(n, "Ethereum nonce not valid")
+			   return INT.new(n) end,
+                         export = function(o) return o:decimal() end },
       ethereum_transaction = { import = import_eth_tx,
 			       export = export_eth_tx },
       signed_ethereum_transaction = { import = O.from_hex,
@@ -148,13 +155,16 @@ function(destaddr)
   new_codec('ethereum transaction', { zentype = 'schema', encoding = 'complex'})
 end)
 
--- we can store only strings (for the moment)
-When("use the ethereum transaction to store ''",
-function(obj)
-  local content = have(obj)
+local function _use_eth_transaction(abi_fun, ...)
   local tx = have'ethereum transaction'
   ZEN.assert(not tx.data or #tx.data == 0, "Cannot overwrite transaction data")
-  tx.data = ETH.make_storage_data(content)
+  tx.data = abi_fun(...)
+end
+
+-- we can store only strings (for the moment)
+When("use the ethereum transaction to store ''",
+function(content)
+  _use_eth_transaction(ETH.make_storage_data, have(content))
 end)
 
 -- TODO: DEPRECATE
@@ -235,4 +245,55 @@ When("create the ethereum key with secret ''",function(sec)
 	initkeyring'ethereum'
 	ECDH.pubgen(sk)
 	ACK.keyring.ethereum = sk
+end)
+
+When("use the ethereum transaction to transfer '' erc20 tokens to ''",
+function(quantity, destaddr)
+    _use_eth_transaction(ETH.erc20.transfer,
+                         have(destaddr),
+                         BIG.new(have(quantity)))
+end)
+
+
+When("use the ethereum transaction to transfer '' erc20 tokens to '' with details ''",
+function(quantity, destaddr, details)
+    _use_eth_transaction(ETH.transfer_erc20_details,
+                         have(destaddr),
+                         BIG.new(have(quantity)),
+                         have(details))
+end)
+
+When("use the ethereum transaction to create the erc721 of uri ''",
+function(uri)
+    _use_eth_transaction(ETH.create_erc721,
+                         have(uri):string())
+end)
+
+When("use the ethereum transaction to create the erc721 of object ''",
+function(uri)
+    _use_eth_transaction(ETH.create_erc721,
+                         have(uri):base64())
+end)
+
+When("use the ethereum transaction to transfer the erc721 '' from '' to ''",
+function(token_id, from, dest)
+    _use_eth_transaction(ETH.erc721.safeTransferFrom,
+                         have(from),
+                         have(dest),
+                         BIG.new(have(token_id)))
+end)
+
+When("use the ethereum transaction to approve the erc721 '' transfer from ''",
+function(token_id, from)
+    _use_eth_transaction(ETH.erc721.approve,
+                         have(from),
+                         BIG.new(have(token_id)))
+end)
+
+When("use the ethereum transaction to transfer the erc721 '' in the contract '' to '' in planetmint",
+function(token_id, nft, to)
+    _use_eth_transaction(ETH.eth_to_planetmint,
+                         have(nft),
+                         BIG.new(have(token_id)),
+                         have(to))
 end)

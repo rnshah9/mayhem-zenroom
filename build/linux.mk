@@ -15,16 +15,17 @@ musl-system: apply-patches milagro embed-lua lua53 zstd
 	CC=${gcc} AR="${ar}" CFLAGS="${cflags}" LDFLAGS="${ldflags}" LDADD="${ldadd}" \
 		$(MAKE) -C src musl
 
+bsd: gcc := clang
 bsd: cflags := -O3 ${cflags_protection} -fPIE -fPIC -DARCH_BSD
 bsd: ldadd += -lm
-bsd: apply-patches milagro lua53 embed-lua zstd
+bsd: ${BUILDS}
 	CC=${gcc} AR="${ar}"  CFLAGS="${cflags}" LDFLAGS="${ldflags}" LDADD="${ldadd}" \
 		$(MAKE) -C src linux
 		@cp -v src/zenroom build/zenroom
 
 
 linux: cflags := -O2 ${cflags_protection} -fPIE -fPIC
-linux: apply-patches milagro lua53 embed-lua zstd quantum-proof
+linux: ${BUILDS}
 	CC=${gcc} AR="${ar}"  CFLAGS="${cflags}" LDFLAGS="${ldflags}" LDADD="${ldadd}" \
 		$(MAKE) -C src linux
 		@cp -v src/zenroom build/zenroom
@@ -54,7 +55,7 @@ linux-riscv64: apply-patches milagro lua53 embed-lua zstd
 	$(MAKE) -C src linux
 	@cp -v src/zenroom build/zenroom
 
-linux-debug: apply-patches milagro lua53 embed-lua zstd
+linux-debug: ${BUILDS}
 	CC=${gcc} AR="${ar}"  CFLAGS="${cflags}" LDFLAGS="${ldflags}" LDADD="${ldadd}" \
 	$(MAKE) -C src linux-debug
 	@cp -v src/zenroom build/zenroom
@@ -129,5 +130,6 @@ linux-rust:
 	cp meson/liblua.a bindings/rust/clib
 	cp meson/libqpz.a bindings/rust/clib
 	cp meson/libzstd.a bindings/rust/clib
+	cp meson/libed25519.a bindings/rust/clib
 	cp src/zenroom.h bindings/rust
 	cd bindings/rust && cargo ${CMD}

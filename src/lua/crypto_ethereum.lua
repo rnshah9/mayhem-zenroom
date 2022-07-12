@@ -99,10 +99,7 @@ end
 -- * res which is the content read
 -- * idx which is the position of the next byte to read
 local function decodeRLPgeneric(rlp, i)
-   local byt, res, idx
-   local u128
-
-   u128 = INT.new(128)
+   local byt, bytInt, res, idx
 
    byt = rlp:sub(i, i)
    idx=i+1
@@ -179,7 +176,7 @@ end
 
 -- modify the input transaction
 function ETH.encodeSignedTransaction(sk, tx)
-   local H, txHash, sig, pk, x, y, two, res
+   local H, txHash, sig, y_parity, two, res
    H = HASH.new('keccak256')
    txHash = H:process(ETH.encodeTransaction(tx))
 
@@ -196,15 +193,11 @@ function ETH.encodeSignedTransaction(sk, tx)
    res.s = INT.new(sig.s)
 
    return ETH.encodeTransaction(res)
-
 end
 
--- Verify the signature of a transaction which implements EIP-155
--- Simple replay attack protection
--- https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md
-function ETH.verifySignatureTransaction(pk, txSigned)
-   local fields, H, txHash, tx
-   fields = {"nonce", "gasPrice", "gasLimit", "to",
+local function hashFromSignedTransaction(txSigned)
+   local fields, H, tx
+   fields = {"nonce", "gas_price", "gas_limit", "to",
 	     "value", "data"}
 
    -- construct the transaction which was signed
@@ -212,20 +205,53 @@ function ETH.verifySignatureTransaction(pk, txSigned)
    for _, v in pairs(fields) do
       tx[v] = txSigned[v]
    end
-   tx["v"] = (txSigned["v"]-INT.new(35))/INT.new(2)
+   tx["v"] = INT.shr(txSigned["v"]-INT.new(35), 1)
    tx["r"] = O.new()
    tx["s"] = O.new()
 
-
    H = HASH.new('keccak256')
-   txHash = H:process(ETH.encodeTransaction(tx))
+   return H:process(ETH.encodeTransaction(tx))
+end
 
-   sig = {
+-- Verify the signature of a transaction which implements EIP-155
+-- Simple replay attack protection
+-- https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md
+function ETH.verifySignatureTransaction(pk, txSigned)
+   local txHash = hashFromSignedTransaction(txSigned)
+
+   local sig = {
       r=txSigned["r"],
       s=txSigned["s"]
    }
 
    return ECDH.verify_hashed(pk, txHash, sig, #txHash)
+end
+
+-- verify the signature of a transaction only with the address
+function ETH.verify_from_address(add, txSigned)
+   local txHash, sig, y_parity, pk, valid
+   txHash = hashFromSignedTransaction(txSigned)
+
+   sig = {
+      r=txSigned.r,
+      s=txSigned.s
+   }
+
+   y_parity = fif(txSigned.v:parity(), 0, 1) -- y_parity=0 <=> v:parity()=1
+
+   local x = INT.new(sig.r)
+   local p = ECDH.prime()
+   local n = ECDH.order()
+   local h = ECDH.cofactor() --h=1
+   repeat
+	   pk, valid = ECDH.recovery(x:octet(), y_parity, txHash, sig)
+	   if h > 0 then   -- do not add n last iteration
+		   x = (x + n) % p
+	   end
+	   h = h-1
+   until (valid and ETH.address_from_public_key(pk) == add) or (h < 0)
+
+   return (valid and ETH.address_from_public_key(pk) == add)
 end
 
 -- Assume we are given a smart contract with a function with the
@@ -295,6 +321,7 @@ function ETH.address_from_public_key(pk)
    return H:process(pk:sub(2, #pk)):sub(13, 32)
 end
 
+-- TODO: remove so many .., there should be something like table.concat for octets
 -- Really simple data encoder, it only works with elementary types (for
 -- example ERC-20 only uses this kind of data types)
 function ETH.data_contract_factory(fz_name, params)
@@ -309,6 +336,29 @@ function ETH.data_contract_factory(fz_name, params)
 
       local res = f_id
 
+
+      local tails = {}
+
+      -- check if there are dynamic types and compute tails
+      for i, v in ipairs(params) do
+
+         if v == 'string' or v == 'bytes' then
+            local arg = nil;
+            if iszen(type(args[i])) then
+               arg = args[i]:octet()
+            else
+               arg = O.new(args[i])
+            end
+
+            table.insert(tails, arg)
+         else
+            table.insert(tails, O.new())
+         end
+      end
+
+      local head_size = #params * 32;
+      local tail_size = 0;
+
       for i, v in ipairs(params) do
 	 -- I don't check the range of values (for bool the input should be 0 or 1),
 	 -- while for int<M> should be 0 ... 2^(<M>)-1
@@ -316,7 +366,25 @@ function ETH.data_contract_factory(fz_name, params)
 	    res = res .. BIG.new(args[i]):fixed(32)
 	 elseif v == 'bool' then
 	    res = res .. BIG.new(fif(args[i], 1, 0)):fixed(32)
+         elseif v == 'string' or v == 'bytes' then
+            -- append offset
+            res = res .. BIG.new(head_size + tail_size):fixed(32)
+            tail_size = tail_size + #tails[i]
 	 end
+      end
+      for i, v in pairs(tails) do
+         if #v > 0 then
+            -- right padding
+            local paddingLength = #v % 32
+            local padding
+            if paddingLength > 0 then
+               paddingLength = 32 - paddingLength
+               padding = O.zero(paddingLength)
+            else
+               padding = O.new()
+            end
+            res = res .. INT.new(#v):fixed(32) .. v .. padding
+         end
       end
       return res
    end
@@ -391,9 +459,27 @@ local FAUCET_SIGNATURES = {
    transfer = { i={'address'} },
 }
 
+ETH.transfer_erc20_details = ETH.data_contract_factory(
+        "transferDetails",
+        {"address", "uint256", "bytes"})
+
 ETH.faucet = {}
 for k, v in pairs(FAUCET_SIGNATURES) do
    ETH.faucet[k] = ETH.data_contract_factory(k, v.i)
 end
 
+-- TODO implement all ERC721 methods
+local ERC721_SIGNATURES = {
+   safeTransferFrom = { i={'address', 'address', 'uint256'} },
+   approve = { i={'address', 'uint256'} },
+}
+
+ETH.erc721 = {}
+for k, v in pairs(ERC721_SIGNATURES) do
+   ETH.erc721[k] = ETH.data_contract_factory(k, v.i)
+end
+
+ETH.create_erc721 = ETH.data_contract_factory("createAsset", { 'string' })
+
+ETH.eth_to_planetmint = ETH.data_contract_factory("beginTransfer", { 'address', 'uint256', 'bytes' })
 return ETH

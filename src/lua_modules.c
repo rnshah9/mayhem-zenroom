@@ -29,8 +29,6 @@
 #include <zenroom.h>
 #include <zen_error.h>
 
-extern int EXITCODE;
-
 // defined in lua_shims.c
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -56,6 +54,7 @@ extern int luaopen_fp12(lua_State *L);
 extern int luaopen_big(lua_State *L);
 extern int luaopen_hash(lua_State *L);
 extern int luaopen_qp(lua_State *L);
+extern int luaopen_ed(lua_State *L);
 
 // really loaded in lib/lua53/linit.c
 // align here for reference
@@ -86,10 +85,10 @@ int zen_load_string(lua_State *L, const char *code,
 	switch (res) {
 	case LUA_OK: { // func(L, "%s OK %s",__func__,name);
 			break; }
-	case LUA_ERRSYNTAX: { error(L, "%s syntax error: %s",__func__,name); break; }
-	case LUA_ERRMEM: { error(L, "%s out of memory: %s",__func__, name); break;  }
+	case LUA_ERRSYNTAX: { zerror(L, "%s syntax error: %s", __func__, name); break; }
+	case LUA_ERRMEM: { zerror(L, "%s out of memory: %s", __func__, name); break;  }
 	case LUA_ERRGCMM: {
-		error(L, "%s garbage collection error: %s",__func__, name);
+		zerror(L, "%s garbage collection error: %s", __func__, name);
 		break; }
 	}
 	// HEREn(size);
@@ -120,8 +119,8 @@ int zen_exec_extension(lua_State *L, zen_extension_t *p) {
 		return 1;
 	}
 #endif
-	error(L, "%s", lua_tostring(L, -1));
-	lerror(L,"%s %s",__func__,p->name); // quits with SIGABRT
+	zerror(L, "%s", lua_tostring(L, -1));
+	lerror(L, "%s %s", __func__, p->name); // quits with SIGABRT
 	fflush(stderr);
 	return 0;
 }
@@ -180,9 +179,11 @@ int zen_require(lua_State *L) {
 		luaL_requiref(L, s, luaopen_hash, 1); }
 	else if(strcasecmp(s, "qp")  ==0) {
 		luaL_requiref(L, s, luaopen_qp, 1); }	
+	else if(strcasecmp(s, "ed")  ==0) {
+		luaL_requiref(L, s, luaopen_ed, 1); }
 	else {
 		// shall we bail out and abort execution here?
-		warning(L, "required extension not found: %s",s);
+		warning(L, "required extension not found: %s", s);
 		return 0; }
 	func(L,"loaded %s",s);
 	return 1;
@@ -192,10 +193,11 @@ int zen_require(lua_State *L) {
 int zen_exitcode(lua_State *L) {
 	int tn;
 	lua_Number n = lua_tonumberx(L,1,&tn);
+	Z(L);
 	if(tn)
-		EXITCODE = (int)n;
+		Z->exitcode = (int)n;
 	else
-		EXITCODE = -1;
+		Z->exitcode = ERR_GENERIC;
 	return 0;
 }
 

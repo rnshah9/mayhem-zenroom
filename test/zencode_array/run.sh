@@ -17,7 +17,7 @@ Z="`detect_zenroom_path` `detect_zenroom_conf`"
 
 set -e
 
-cat <<EOF | zexe array_32_256.zen > arr.json
+cat <<EOF | zexe array_32_256.zen | save array arr.json
 rule output encoding url64
 Given nothing
 When I create the array of '32' random objects of '256' bits
@@ -138,16 +138,6 @@ and I verify 'third' is equal to 'tertiur'
 Then print the 'test' as 'string'
 EOF
 
-cat <<EOF | zexe random_from_array.zen
-rule check version 1.0.0
-Given nothing
-When I create the array of '32' random objects of '256' bits
-and I pick the random object in 'array'
-and I remove the 'random object' from 'array'
-and the 'random object' is not found in 'array'
-Then print the 'random object'
-EOF
-
 cat <<EOF | zexe leftmost_split.zen
 rule check version 1.0.0
 Given nothing
@@ -155,28 +145,6 @@ When I set 'whole' to 'Zenroom works great' as 'string'
 and I split the leftmost '3' bytes of 'whole'
 Then print the 'leftmost' as 'string'
 and print the 'whole' as 'string'
-EOF
-
-cat <<EOF | zexe random_numbers.zen | tee array_random_nums.json
-Given nothing
-When I create the array of '64' random numbers
-Then print the 'array' as 'number'
-EOF
-
-
-cat <<EOF | zexe random_numbers.zen | tee array_random_nums.json
-Given nothing
-When I create the array of '64' random numbers modulo '100'
-and I create the aggregation of array 'array'
-Then print the 'array' as 'number'
-and print the 'aggregation' as 'number'
-EOF
-
-cat <<EOF | zexe cbor.zen -a array_random_nums.json
-Given I have an 'number array' named 'array'
-When I create the cbor of 'array'
-Then print the 'cbor' as 'hex'
-and print the 'array'
 EOF
 
 # cat << EOF > array_public_bls.json
@@ -562,6 +530,121 @@ If the elements in 'arr' are not all equal
 If the elements in 'dict' are not all equal
 If the elements in 'nested arr' are not all equal
 Then print string 'OK'
+EOF
+
+cat <<EOF | save array table-arrays.json
+{ "identity": {
+    "announceAPI": "/api/zenswarm-oracle-announce",
+    "baseUrl": "http://zenswarm.zenroom.org",
+    "country": "IT",
+    "ethereum-notarizationAPI": "/api/ethereum-to-ethereum-notarization.chain",
+    "get-identityAPI": "/api/zenswarm-oracle-get-identity",
+    "http-postAPI": "/api/zenswarm-oracle-http-post",
+    "oracle-key-issuance": "/api/zenswarm-oracle-key-issuance.chain",
+    "pingAPI": "/api/zenswarm-oracle-ping.zen",
+    "port_http": "28170",
+    "port_https": "28331",
+    "sawroom-notarizationAPI": "/api/sawroom-to-ethereum-notarization.chain",
+    "timestampAPI": "/api/zenswarm-oracle-get-timestamp.zen",
+    "tracker": "https://apiroom.net/",
+    "type": "restroom-mw",
+    "updateAPI": "/api/zenswarm-oracle-update",
+    "version": "2"
+  },
+"identities": [
+ {
+      "announceAPI": "/api/zenswarm-oracle-announce",
+      "baseUrl": "http://zenswarm.zenroom.org",
+      "country": "IT",
+      "ethereum-notarizationAPI": "/api/ethereum-to-ethereum-notarization.chain",
+      "get-identityAPI": "/api/zenswarm-oracle-get-identity",
+      "http-postAPI": "/api/zenswarm-oracle-http-post",
+      "oracle-key-issuance": "/api/zenswarm-oracle-key-issuance.chain",
+      "pingAPI": "/api/zenswarm-oracle-ping.zen",
+      "port_http": "26962",
+      "port_https": "25991",
+      "region": "NONE",
+      "sawroom-notarizationAPI": "/api/sawroom-to-ethereum-notarization.chain",
+      "timestampAPI": "/api/zenswarm-oracle-get-timestamp.zen",
+      "tracker": "https://apiroom.net/",
+      "type": "restroom-mw",
+      "updateAPI": "/api/zenswarm-oracle-update",
+      "version": "2"
+    },
+    {
+      "announceAPI": "/api/zenswarm-oracle-announce",
+      "baseUrl": "http://zenswarm.zenroom.org",
+      "country": "IT",
+      "ethereum-notarizationAPI": "/api/ethereum-to-ethereum-notarization.chain",
+      "get-identityAPI": "/api/zenswarm-oracle-get-identity",
+      "http-postAPI": "/api/zenswarm-oracle-http-post",
+      "oracle-key-issuance": "/api/zenswarm-oracle-key-issuance.chain",
+      "pingAPI": "/api/zenswarm-oracle-ping.zen",
+      "port_http": "26368",
+      "port_https": "29841",
+      "region": "NONE",
+      "sawroom-notarizationAPI": "/api/sawroom-to-ethereum-notarization.chain",
+      "timestampAPI": "/api/zenswarm-oracle-get-timestamp.zen",
+      "tracker": "https://apiroom.net/",
+      "type": "restroom-mw",
+      "updateAPI": "/api/zenswarm-oracle-update",
+      "version": "2"
+    },
+{
+    "announceAPI": "/api/zenswarm-oracle-announce",
+    "baseUrl": "http://zenswarm.zenroom.org",
+    "country": "IT",
+    "ethereum-notarizationAPI": "/api/ethereum-to-ethereum-notarization.chain",
+    "get-identityAPI": "/api/zenswarm-oracle-get-identity",
+    "http-postAPI": "/api/zenswarm-oracle-http-post",
+    "oracle-key-issuance": "/api/zenswarm-oracle-key-issuance.chain",
+    "pingAPI": "/api/zenswarm-oracle-ping.zen",
+    "port_http": "28170",
+    "port_https": "28331",
+    "sawroom-notarizationAPI": "/api/sawroom-to-ethereum-notarization.chain",
+    "timestampAPI": "/api/zenswarm-oracle-get-timestamp.zen",
+    "tracker": "https://apiroom.net/",
+    "type": "restroom-mw",
+    "updateAPI": "/api/zenswarm-oracle-update",
+    "version": "2"
+}
+  ]
+}
+
+EOF
+
+cat <<EOF | zexe remove-table-from-table.zen -a table-arrays.json | jq .
+Given I have a 'string array' named 'identities'
+Given I have a 'string array' named 'identity'
+When I create the size of 'identities'
+and I rename 'size' to 'before'
+and I remove the 'identity' from 'identities'
+and I create the size of 'identities'
+and I rename 'size' to 'after'
+Then print the 'before'
+and print the 'after'
+EOF
+
+cat <<EOF > split.data
+{
+  "id": "did:example:123456789abcdefghi#keys-1",
+  "strange_id": "did::",
+  "very_strange_id": "::",
+  "separator": ":"
+}
+EOF
+
+cat <<EOF | zexe split.zen -a split.data
+Given I have a 'string' named 'id'
+Given I have a 'string' named 'strange_id'
+Given I have a 'string' named 'very_strange_id'
+Given I have a 'string' named 'separator'
+When I create the array by splitting 'strange_id' at 'separator'
+When I rename 'array' to 'strange_array'
+When I create the array by splitting 'very_strange_id' at 'separator'
+When I rename 'array' to 'very_strange_array'
+When I create the array by splitting 'id' at 'separator'
+Then print the data
 EOF
 
 success
